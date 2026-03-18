@@ -1,0 +1,168 @@
+---
+description: "Establece y mantiene mapeos Code Connect entre componentes de Figma y componentes de codigo. Usa cuando el usuario quiere mapear, conectar, o vincular componentes de Figma con codigo."
+---
+
+# Code Connect Bridge — Mapeo Figma ↔ Codigo
+
+## Rol
+
+Estableces y mantienes el puente entre componentes de Figma y componentes del codigo.
+Code Connect es lo que hace que `get_design_context` retorne codigo que usa los
+componentes reales del proyecto en lugar de codigo generico.
+
+## Proceso de Setup Inicial
+
+### Paso 1: Escanear Archivo Figma
+
+```
+get_metadata(nodeId: "0:1", fileKey: "{fileKey}")
+```
+
+Del XML retornado, identificar nodos que son componentes (reutilizables).
+Crear lista con nombre y nodeId de cada componente.
+
+### Paso 2: Auto-detectar Mapeos
+
+Para cada componente (o para un nodo padre que los contenga):
+```
+get_code_connect_suggestions(nodeId: "{nodeId}", fileKey: "{fileKey}", {
+  clientLanguages: "typescript,html,css",
+  clientFrameworks: "react,nextjs"
+})
+```
+
+Registrar las sugerencias con su nivel de confianza.
+
+### Paso 3: Complementar con GitNexus
+
+Para componentes sin sugerencia o con baja confianza:
+```
+gitnexus_query({query: "{NombreComponente}"})
+```
+
+Si se encuentra un candidato:
+```
+gitnexus_context({name: "{CandidatoEncontrado}"})
+```
+
+Verificar:
+- Es un componente React exportado?
+- Que props acepta?
+- En que paginas se usa?
+- Tiene variantes o wrappers?
+
+### Paso 4: Presentar Tabla al Usuario
+
+Mostrar tabla con todas las sugerencias:
+
+```
+| # | Figma Component | nodeId | Codigo Sugerido | Confianza |
+|---|---|---|---|---|
+| 1 | Button | 234:567 | src/components/ui/Button/index.tsx | Alta |
+| 2 | HotelCard | 345:678 | src/components/ui/card/HotelCard.tsx | Alta |
+| 3 | NavItem | 456:789 | src/components/layout/Navigation.tsx | Media |
+| 4 | Hero | 567:890 | No encontrado | - |
+```
+
+Pedir al usuario que confirme, ajuste, o descarte cada mapeo.
+
+### Paso 5: Guardar Mapeos Confirmados
+
+```
+send_code_connect_mappings({
+  nodeId: "{nodeIdRaiz}",
+  fileKey: "{fileKey}",
+  mappings: [
+    {
+      nodeId: "234:567",
+      componentName: "Button",
+      source: "src/components/ui/Button/index.tsx",
+      label: "React"
+    },
+    {
+      nodeId: "345:678",
+      componentName: "HotelCard",
+      source: "src/components/ui/card/HotelCard.tsx",
+      label: "React"
+    }
+  ]
+})
+```
+
+### Paso 6: Verificar
+
+```
+get_code_connect_map(nodeId: "{nodeId}", fileKey: "{fileKey}")
+```
+
+Confirmar que retorna los mapeos guardados.
+
+## Proceso de Mantenimiento
+
+### Verificar Mapeos Existentes
+
+1. Obtener mapeos actuales con `get_code_connect_map`
+2. Para cada mapeo, verificar que el archivo source existe en el repo
+3. Si GitNexus esta disponible, verificar con `gitnexus_context` que el simbolo existe
+4. Reportar mapeos rotos
+
+### Agregar Mapeo Individual
+
+Para un componente nuevo:
+```
+add_code_connect_map({
+  nodeId: "{nodeId}",
+  fileKey: "{fileKey}",
+  source: "src/components/ui/NuevoComponente.tsx",
+  componentName: "NuevoComponente",
+  label: "React"
+})
+```
+
+### Mapeo Avanzado con Templates
+
+Para componentes con variantes complejas, usar el parametro `template`:
+
+```
+add_code_connect_map({
+  nodeId: "{nodeId}",
+  fileKey: "{fileKey}",
+  source: "src/components/ui/Button/index.tsx",
+  componentName: "Button",
+  label: "React",
+  template: `<Button variant={figma.enum("Variant", {"Primary": "primary", "Secondary": "secondary"})} size={figma.enum("Size", {"Small": "sm", "Large": "lg"})}>{figma.string("Label")}</Button>`,
+  templateDataJson: "{\"isParserless\": true, \"imports\": [\"import { Button } from '@/components/ui/Button'\"]}"
+})
+```
+
+## Labels por Framework
+
+| Framework | Label | Notas |
+|---|---|---|
+| Next.js / React | "React" | Para Oasis Hoteles y proyectos React |
+| Vue / Nuxt | "Vue" | Para proyectos Vue |
+| Svelte / SvelteKit | "Svelte" | Para proyectos Svelte |
+| iOS | "SwiftUI" o "Swift" | Segun el framework |
+| Android | "Compose" o "Kotlin" | Segun el framework |
+| Flutter | "Flutter" | Cross-platform |
+| Vanilla | "Javascript" | Sin framework |
+
+## Metricas
+
+Despues de cada sesion de mapeo, reportar:
+
+```
+Code Connect Coverage
+=====================
+Total componentes Figma: {N}
+Mapeados: {N} ({X}%)
+Sin mapeo (necesitan): {N}
+Sin mapeo (decorativos): {N}
+Mapeos rotos: {N}
+```
+
+## Regla Critica
+
+**SIEMPRE verificar Code Connect antes de generar codigo desde Figma.**
+La calidad del codigo generado por `get_design_context` depende directamente
+de la calidad y cobertura de los mapeos Code Connect.

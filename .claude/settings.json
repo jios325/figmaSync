@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__figma-console",
+      "mcp__figma-remote"
+    ]
+  }
+}
