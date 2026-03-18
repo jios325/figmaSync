@@ -139,7 +139,7 @@ add_code_connect_map({
 
 | Framework | Label | Notas |
 |---|---|---|
-| Next.js / React | "React" | Para Oasis Hoteles y proyectos React |
+| Next.js / React | "React" | Para proyectos React/Next.js |
 | Vue / Nuxt | "Vue" | Para proyectos Vue |
 | Svelte / SvelteKit | "Svelte" | Para proyectos Svelte |
 | iOS | "SwiftUI" o "Swift" | Segun el framework |
