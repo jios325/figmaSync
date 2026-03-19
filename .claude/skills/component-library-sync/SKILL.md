@@ -34,56 +34,33 @@ Registra, organiza y mantiene la libreria de componentes locales en la pagina "D
 > Si el archivo no tiene variables de color aplicadas, ejecutar `/token-sync` primero.
 > Componentes sin tokens = componentes que habra que re-hacer cuando se tokenice.
 
-## Estructura de la pagina Design System
+## Estructura de la pagina Design System (template)
 
 ```
 Design System (pagina)
-├── Seccion: Componentes Locales (SECTION frame existente)
+├── Seccion: Componentes Locales (SECTION frame)
 │   ├── Categoría: Bars
-│   │   ├── bar entretenimiento (COMPONENT_SET, 2 variantes)
-│   │   ├── bar restaurantes (COMPONENT_SET, 4 variantes)
-│   │   ├── bar servicios (COMPONENT_SET, 2 variantes)
-│   │   ├── bar amenidades (COMPONENT_SET, 3 variantes)
-│   │   └── bar promos (COMPONENT)
+│   │   └── {nombre} (COMPONENT_SET o COMPONENT)
 │   ├── Categoría: Cards
-│   │   ├── card hotel (COMPONENT)
-│   │   ├── card fotos (COMPONENT_SET, 4 variantes)
-│   │   ├── dsct hotels (COMPONENT_SET)
-│   │   └── foto-drag and drop (COMPONENT_SET)
+│   │   └── {nombre} (COMPONENT_SET o COMPONENT)
 │   ├── Categoría: Navigation
-│   │   ├── side bar (COMPONENT_SET, 2 variantes)
-│   │   ├── item (COMPONENT_SET, 8 variantes)
-│   │   ├── menu interno (COMPONENT)
-│   │   ├── menu servicios (COMPONENT)
-│   │   └── hoteles tab (COMPONENT)
+│   │   └── sidebar, menu, tabs, breadcrumbs...
 │   ├── Categoría: Forms
-│   │   ├── input (COMPONENT_SET, 3 variantes)
-│   │   ├── select (COMPONENT_SET)
-│   │   ├── checkbox (COMPONENT_SET)
-│   │   ├── tab seo (COMPONENT)
-│   │   └── pick color (FRAME → convertir a COMPONENT)
+│   │   └── input, select, checkbox, radio, switch...
 │   ├── Categoría: Buttons
-│   │   ├── primary button (COMPONENT_SET)
-│   │   ├── secondary button (COMPONENT_SET)
-│   │   └── secondary button blue (COMPONENT_SET)
+│   │   └── primary, secondary, icon buttons...
 │   ├── Categoría: Layout
-│   │   ├── base bar (COMPONENT)
-│   │   ├── bg (COMPONENT)
-│   │   ├── divisor (COMPONENT)
-│   │   └── titulo (COMPONENT)
+│   │   └── header, bg, divider, title...
 │   └── Categoría: Modals
-│       ├── modal amenidades (COMPONENT)
-│       ├── modal nueva pregunta (COMPONENT)
-│       └── modal fotos catalogo (COMPONENT)
+│       └── confirmation, form modals...
 │
-├── Componentes sueltos (fuera de la seccion)
-│   ├── mercados div
-│   ├── opiniones
-│   └── tabs-promo internas
+├── Componentes sueltos (mover a la seccion)
 │
-└── Ant Design Overrides (FUTURO)
-    └── Componentes que extienden Ant Design
+└── {Framework} Overrides (opcional)
+    └── Componentes que extienden la libreria UI externa
 ```
+
+**Nota:** Las categorias se adaptan al proyecto. Descubrir los componentes existentes y organizarlos por tipo, no por nombre de proyecto.
 
 ## Proceso: Registrar componente nuevo
 
@@ -145,7 +122,7 @@ if (node.type === 'FRAME') {
 
 ```
 Convención de naming:
-  - Componentes simples: kebab-case → "bar restaurantes", "card hotel"
+  - Componentes simples: kebab-case → "list-item", "product-card"
   - Component sets: kebab-case → "primary button" con variantes
   - Variantes: "Property=Value" → "State=Default", "State=Hover", "Size=Small"
 

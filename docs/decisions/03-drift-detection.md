@@ -217,7 +217,7 @@ Implementacion via `mcp__scheduled-tasks__create_scheduled_task`:
 {
   "taskId": "drift-detection-weekly",
   "cronExpression": "0 9 * * 1",
-  "prompt": "Run drift detection for Oasis Hoteles. Compare top 10 pages...",
+  "prompt": "Run drift detection for Example Project. Compare top 10 pages...",
   "description": "Weekly drift detection between Figma and production"
 }
 ```

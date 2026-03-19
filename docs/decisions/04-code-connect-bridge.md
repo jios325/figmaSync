@@ -25,7 +25,7 @@ Con Code Connect:
 ```
 get_design_context retorna:
   <HotelCard
-    hotel={hotel}
+    item={item}
     variant="horizontal"
     showRating={true}
   />
@@ -225,7 +225,7 @@ Para componentes con variantes, se puede crear un template mas detallado:
 | Storybook | Cualquier framework | Stories como referencia |
 | Javascript | Vanilla JS | Funciones/clases JS |
 
-Para Oasis Hoteles: **label = "React"**
+Para Example Project: **label = "React"**
 
 ## Estrategia para Proyectos Multiples
 
@@ -233,17 +233,17 @@ Si tienes varios proyectos que comparten un archivo Figma (ej: design system cen
 
 ```
 Archivo Figma: "Design System Corporativo"
-  ├── Proyecto A: Oasis Hoteles (Next.js)
+  ├── Proyecto A: Example Project (Next.js)
   │   Label: "React"
-  │   Source: github.com/oasis/frontend/src/components/
+  │   Source: github.com/example/frontend/src/components/
   │
   ├── Proyecto B: CMS Corporativo (Vue)
   │   Label: "Vue"
-  │   Source: github.com/oasis/cms/src/components/
+  │   Source: github.com/example/cms/src/components/
   │
   └── Proyecto C: App Mobile (Flutter)
       Label: "Flutter"
-      Source: github.com/oasis/mobile/lib/widgets/
+      Source: github.com/example/mobile/lib/widgets/
 
 Cada proyecto tiene su propio set de mapeos con label diferente.
 get_code_connect_map puede filtrar por label (codeConnectLabel param).

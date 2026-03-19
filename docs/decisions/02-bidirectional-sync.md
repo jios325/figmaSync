@@ -82,7 +82,7 @@ PASO 7: VERIFICACION VISUAL
 El agente debe leer el contexto del proyecto para adaptarse:
 
 ```
-Para Oasis Hoteles (Next.js 14 + TailwindCSS + next-intl):
+Para Example Project (Next.js 14 + TailwindCSS + next-intl):
 - Componentes en src/components/ui/ o src/components/sections/
 - Traducciones en src/locales/{en,es}/
 - API calls con fetchAPI de @/api/utils

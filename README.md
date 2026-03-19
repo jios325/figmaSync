@@ -155,6 +155,7 @@ Ver `docs/how-to-adopt.md` para la guia detallada.
 
 ## Proyectos Compatibles
 
-Funciona con cualquier proyecto frontend. Probado con:
-- **CMS Oasis Hoteles** — Next.js 15, React 19, Ant Design 5
-- **Oasis Hoteles** — Next.js 14, React 18, TailwindCSS
+Funciona con cualquier proyecto frontend y cualquier framework UI:
+- React, Next.js, Vue, Nuxt, Svelte, Angular
+- Ant Design, Material UI, Tailwind, Shadcn/ui, Chakra, Bootstrap
+- CSS custom properties, Style Dictionary, cualquier sistema de tokens

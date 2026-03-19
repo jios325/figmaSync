@@ -356,7 +356,7 @@ Trigger: "Mapea los componentes de Figma con el codigo"
                | Figma Component | Codigo | Confianza |
                |---|---|---|
                | Button/Primary | src/components/ui/Button | Alta |
-               | HotelCard | src/components/ui/card/HotelCard | Alta |
+               | ProductCard | src/components/ui/card/ProductCard | Alta |
                | ???Gallery | No encontrado | - |
 5. [CONFIRM]   Usuario confirma/ajusta mapeos
 6. [SAVE]      send_code_connect_mappings(mappings)
@@ -465,7 +465,7 @@ claude mcp add figma-console -s user -e FIGMA_ACCESS_TOKEN=figd_XXX -e ENABLE_MC
 // figma_execute:
 await figma.loadAllPagesAsync();
 const newPage = figma.createPage();
-newPage.name = 'Hotel Interna';
+newPage.name = 'Feature Detail';
 
 // Mover un frame a la nueva pagina
 const frame = figma.getNodeById('612:2620');
@@ -482,8 +482,8 @@ const page = figma.currentPage;
 const frames = page.children.filter(n => n.type === 'FRAME');
 const renames = [];
 for (const f of frames) {
-  if (f.name.startsWith('interna/')) {
-    const newName = f.name.replace('interna/', 'Hotel/');
+  if (f.name.startsWith('feature/')) {
+    const newName = f.name.replace('feature/', 'Feature/');
     f.name = newName;
     renames.push({ old: f.name, new: newName });
   }
@@ -518,8 +518,8 @@ claude mcp add --transport http figma-remote https://mcp.figma.com/mcp
 **Ejemplo de uso:**
 ```
 Extraer fileKey y nodeId de:
-https://figma.com/design/6fN8UlkT1fyrWh8rgAjBuw/cms-corporativo?node-id=1635-27981
-→ fileKey: 6fN8UlkT1fyrWh8rgAjBuw
+https://figma.com/design/{fileKey}/{fileName}?node-id=1635-27981
+→ fileKey: {fileKey}
 → nodeId: 1635:27981
 ```
 
@@ -644,22 +644,22 @@ https://figma.com/design/6fN8UlkT1fyrWh8rgAjBuw/cms-corporativo?node-id=1635-279
 #### `gitnexus_impact`
 **Uso en FigmaSync:** Evaluar que se rompe antes de cambiar un componente.
 ```
-gitnexus_impact({target: "BookingHotelCard", direction: "upstream"})
+gitnexus_impact({target: "BookingCard", direction: "upstream"})
 → Muestra todos los callers, paginas afectadas, nivel de riesgo
 ```
 
 #### `gitnexus_context`
 **Uso en FigmaSync:** Ver contexto completo de un componente (callers, callees, procesos).
 ```
-gitnexus_context({name: "GalleryCollage"})
+gitnexus_context({name: "ImageGallery"})
 → Quien lo importa, que hooks usa, en que paginas aparece
 ```
 
 #### `gitnexus_query`
 **Uso en FigmaSync:** Encontrar componentes por concepto.
 ```
-gitnexus_query({query: "hotel card booking"})
-→ Encuentra componentes relacionados con reservas de hotel
+gitnexus_query({query: "product card component"})
+→ Encuentra componentes relacionados con componentes relacionados
 ```
 
 #### `gitnexus_detect_changes`
@@ -675,7 +675,7 @@ gitnexus_detect_changes({scope: "staged"})
 URL: https://figma.com/design/{fileKey}/{fileName}?node-id={nodeId}
 
 Ejemplo:
-https://figma.com/design/6fN8UlkT1fyrWh8rgAjBuw/cms-corporativo-2024?node-id=1635-27981
+https://figma.com/design/{fileKey}/{fileName}?node-id=1635-27981
                             ^^^^^^^^^^^^^^^^^^^^^^^^                       ^^^^^^^^^
                             fileKey                                        nodeId → 1635:27981
 
