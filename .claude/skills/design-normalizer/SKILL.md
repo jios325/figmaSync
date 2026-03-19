@@ -36,6 +36,31 @@ Analizar el XML retornado buscando:
 - **Profundidad:** Anidacion excesiva (>6 niveles)
 - **Layers genericos:** "Frame 123", "Group 45", "Rectangle 67"
 
+### Paso 2.5: Inventario de Colores, Tipografia y Spacing
+
+Ejecutar via `figma_execute` un scan recursivo de todos los nodos:
+
+**Colores:** Extraer todos los hex unicos de fills y strokes con conteo de usos.
+```javascript
+// Traverse all nodes, build { hex: count } map
+// Sort by count descending
+// OUTPUT: tabla de "colores candidatos a token"
+```
+
+**Tipografia:** Extraer combinaciones unicas de fontFamily + fontSize + fontWeight.
+```javascript
+// For each TEXT node: record { family, size, weight, lineHeight }
+// Deduplicate and count
+```
+
+**Spacing:** Extraer valores unicos de padding y gap de frames con Auto Layout.
+```javascript
+// For each frame with layoutMode: record padding (top/right/bottom/left) and gap
+// Deduplicate and count
+```
+
+El reporte debe incluir estas tablas ordenadas por frecuencia de uso.
+
 ### Paso 3: Auditar Tokens
 
 Ejecutar:
@@ -63,18 +88,10 @@ Evaluar:
 - **Auto Layout:** Usan Auto Layout (mapeable a Flexbox)?
 - **Duplicados:** Hay componentes casi-identicos?
 
-### Paso 5: Comparar con Codigo (si hay tailwind.config)
+### Paso 5: Comparar con Codigo (opcional, si hay proyecto de codigo asociado)
 
-Si el proyecto tiene tailwind.config.ts:
-```
-Leer tailwind.config.ts del proyecto
-Comparar tokens de Figma vs tokens de Tailwind:
-- Colores
-- Font families y sizes
-- Spacing scale
-- Border radius
-- Breakpoints
-```
+Si el usuario indica un proyecto de codigo, delegar a `/token-sync` para la comparacion.
+El design-normalizer se enfoca en la salud del archivo Figma, no en la sincronizacion con codigo.
 
 ### Paso 6: Generar Reporte
 

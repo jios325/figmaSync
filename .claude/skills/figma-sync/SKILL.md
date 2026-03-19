@@ -36,11 +36,18 @@ Analiza el prompt del usuario y decide que flujo ejecutar:
 
 ### Si el usuario quiere auditar/normalizar un archivo de Figma:
 **Flujo: Normalizacion**
-1. Ejecutar `get_metadata` para la estructura completa
-2. Ejecutar `get_variable_defs` para los tokens
-3. Auditar naming, estructura, tokens, componentes
-4. Generar reporte con score y recomendaciones
-5. Opcionalmente: `create_design_system_rules` para generar reglas
+- Si solo quiere un reporte/auditoria → ejecutar `/design-normalizer`
+- Si quiere normalizar completamente (cleanup + tokens + componentes) → ejecutar `/normalization-pipeline`
+
+El pipeline de normalizacion sigue 6 fases en orden estricto:
+1. Auditoria (read-only)
+2. Limpieza estructural
+3. Tokenizacion (SIEMPRE antes de componentizar)
+4. Auto Layout
+5. Componentizacion
+6. Validacion
+
+REGLA: Tokens ANTES de componentes. Siempre.
 
 ### Si el usuario quiere detectar diferencias entre Figma y produccion:
 **Flujo: Drift Detection**

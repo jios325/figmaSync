@@ -1,101 +1,145 @@
-# FigmaSync — AI Design Operations Toolkit
+# CLAUDE.md
 
-## Que es este proyecto
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Que es esto
 
 Toolkit de agentes AI para sincronizacion bidireccional Figma <-> Codigo.
-Funciona con CUALQUIER proyecto — no esta atado a un framework, libreria UI, o repo especifico.
+No es una app — son skills, runbooks y prompts que Claude Code interpreta para operar sobre Figma.
+Funciona con CUALQUIER proyecto, framework o libreria UI.
 
-> No es una app. Son skills, runbooks y prompts que Claude Code interpreta para operar sobre Figma.
+## Stack MCP (Dos Canales)
 
-## Stack de herramientas MCP
+| MCP | Canal | Funcion |
+|-----|-------|---------|
+| **figma-console-mcp** | WebSocket (Plugin API) | ESCRITURA: crear, mover, eliminar, renombrar, redimensionar nodes |
+| **Figma Remote** | HTTP REST (PAT token) | LECTURA: metadata, screenshots, design context, Code Connect |
+| **GitNexus** | Local (opcional) | Analisis de impacto en codigo, descubrimiento de componentes |
 
-| MCP | Tipo | Funcion |
-|-----|------|---------|
-| **figma-console-mcp** | Local (WebSocket) | ESCRITURA: crear, mover, eliminar, renombrar nodes en Figma |
-| **Figma Remote** | HTTP (Cloud) | LECTURA: metadata, screenshots, design context, Code Connect |
-| **GitNexus** | Local (opcional) | Analisis de impacto en codigo |
-
-## Estructura
-
+**Arquitectura de conexion:**
 ```
-figmaSync/
-├── CLAUDE.md                  ← Este archivo (contexto AI)
-├── README.md                  ← Documentacion publica
-├── docs/
-│   ├── architecture.md        ← Arquitectura, flujo de datos, referencia MCP
-│   ├── how-to-adopt.md        ← Guia para adoptar en cualquier proyecto
-│   ├── decisions/             ← ADRs y decisiones de diseno
-│   └── runbooks/              ← Workflows paso a paso
-├── .claude/
-│   ├── settings.json
-│   ├── hooks/
-│   └── skills/                ← 10 skills (todos project-agnostic)
-│       ├── figma-sync/        ← Orquestador principal
-│       ├── screen-creator/    ← Crear pantallas nuevas
-│       ├── component-library-sync/ ← Gestionar libreria de componentes
-│       ├── token-sync/        ← Sincronizar design tokens
-│       ├── ui-framework-patterns/  ← Patrones por framework UI
-│       ├── variant-generator/ ← Generar variantes desde codigo
-│       ├── figma-quality-gate/ ← Validacion post-creacion
-│       ├── design-normalizer/ ← Auditar archivos Figma
-│       ├── drift-detection/   ← Detectar diferencias Figma vs prod
-│       └── code-connect-bridge/ ← Mapear componentes Figma a codigo
-└── tools/
-    ├── scripts/
-    └── prompts/               ← Templates de reportes
+Figma Desktop <--WebSocket:9223--> figma-console-mcp <--> Claude Code  (ESCRITURA)
+PAT Token --> REST API --> Figma Cloud                                  (LECTURA)
 ```
 
-## Reglas criticas
+## Reglas Criticas
 
-- **figma-console-mcp** requiere Figma Desktop con el plugin Desktop Bridge corriendo
-- Antes de escribir en Figma, SIEMPRE verificar conexion con `figma_get_status`
-- Las operaciones de escritura van por Plugin API (WebSocket), no por REST API
-- `figma_execute` ejecuta JS arbitrario en contexto del plugin — es la herramienta mas poderosa
+- **figma-console-mcp** requiere Figma Desktop (NO web app) con el plugin Desktop Bridge corriendo
+- Antes de CUALQUIER operacion de escritura, verificar conexion con `figma_get_status`
+- Las operaciones de escritura van por Plugin API (WebSocket), NO por REST API
+- `figma_execute` ejecuta JS arbitrario en contexto del plugin — herramienta mas poderosa, usada para operaciones en lote, crear paginas, mover nodes entre paginas
 - Solo 2 operaciones requieren intervencion manual: copiar entre archivos Figma e importar librerias externas
+- Solo UN archivo Figma activo por conexion WebSocket (cambiar con `figma_navigate`)
 
-## Filosofia: Project-Agnostic
+## Parseo de URLs de Figma
 
-Este toolkit NO asume:
-- Que framework UI usas (Ant Design, Material UI, Chakra, Tailwind, etc.)
-- Que framework de codigo usas (React, Vue, Svelte, etc.)
-- Que estructura tiene tu proyecto
-- Que naming convention usas
+```
+Formato URL: https://figma.com/design/{fileKey}/{fileName}?node-id={nodeId}
+URL de branch: https://figma.com/design/{fileKey}/branch/{branchKey}/{fileName}
+  → Usar branchKey como fileKey
 
-Cada skill se adapta al proyecto donde se ejecuta leyendo:
-1. **El archivo Figma activo** — estructura, componentes, tokens existentes
-2. **El CLAUDE.md del proyecto destino** — convenciones, stack, reglas
-3. **El codigo del proyecto** — componentes, props, estilos
+Conversion de Node ID: la URL usa "-", los tools usan ":"
+  1635-27981 (URL) → 1635:27981 (parametro)
+```
 
-## Skills disponibles
+## Skills (11, todos project-agnostic)
+
+### Normalizacion
+| Skill | Cuando usar |
+|-------|-------------|
+| `/normalization-pipeline` | **Pipeline completo** para normalizar un archivo Figma desordenado (6 fases en orden) |
+| `/design-normalizer` | Auditar salud del archivo Figma (score 0-100, naming, tokens, Auto Layout) |
 
 ### Creacion
 | Skill | Cuando usar |
 |-------|-------------|
-| `screen-creator` | Crear pantallas nuevas siguiendo patrones existentes |
-| `component-library-sync` | Registrar componentes nuevos en Design System |
-| `variant-generator` | Crear variantes desde props/enums del codigo |
+| `/screen-creator` | Crear pantallas nuevas (siempre clona una hermana existente, nunca desde cero) |
+| `/component-library-sync` | Registrar componentes nuevos en la pagina Design System |
+| `/variant-generator` | Generar variantes desde props/enums del codigo |
 
 ### Sincronizacion
 | Skill | Cuando usar |
 |-------|-------------|
-| `figma-sync` | Orquestar cualquier operacion Figma <-> Codigo |
-| `token-sync` | Sincronizar design tokens (colores, spacing, tipografia) |
-| `code-connect-bridge` | Mapear componentes Figma a componentes de codigo |
+| `/figma-sync` | Orquestador — rutea al sub-skill correcto segun el intent |
+| `/token-sync` | Sincronizar design tokens (Figma ↔ codigo, o design-only) |
+| `/code-connect-bridge` | Mapear componentes de Figma a componentes de codigo |
 
 ### Calidad
 | Skill | Cuando usar |
 |-------|-------------|
-| `design-normalizer` | Auditar y normalizar archivos de Figma |
-| `drift-detection` | Detectar diferencias entre diseno y produccion |
-| `figma-quality-gate` | Validar calidad post-creacion |
-| `ui-framework-patterns` | Patrones CRUD por framework UI |
+| `/drift-detection` | Comparar Figma vs produccion via diff visual + estructural |
+| `/figma-quality-gate` | Checklist de validacion post-creacion |
+| `/ui-framework-patterns` | Patrones de pantallas CRUD por framework UI |
 
-## Como adoptar en un proyecto nuevo
+## Pipeline de Normalizacion (orden estricto)
 
+Para normalizar un archivo Figma desordenado, ejecutar EN ESTE ORDEN:
+
+```
+1. /design-normalizer       → Auditoria (score inicial, inventario de colores)
+2. Limpieza estructural     → Renombrar layers, aplanar nesting, organizar paginas
+3. /token-sync              → Extraer colores REALES del diseno, crear y aplicar variables
+4. Auto Layout              → Convertir layouts fijos a flexbox (bottom-up)
+5. /component-library-sync  → Extraer y organizar componentes
+6. /figma-quality-gate      → Validacion final (score objetivo: >80)
+```
+
+**REGLA:** Tokens ANTES de componentes. Siempre.
+**REGLA:** Fuente de verdad de colores = el diseno, NUNCA el codigo.
+**REGLA:** Checkpoint visual despues de cada fase. Si algo se ve mal → undo.
+**REGLA:** Aplicar variables por CONTEXTO (nombre/tipo de nodo), NO por hex match.
+**REGLA:** Copiar componentes como referencia ANTES de tokenizar.
+
+## Errores Conocidos en Tokenizacion
+
+| Error | Causa | Prevencion |
+|-------|-------|------------|
+| Colores no coinciden | Se usaron colores del codigo | Escanear hex reales del archivo Figma |
+| Nodos se ven negros | Bindings huerfanas de colecciones borradas | NUNCA borrar colecciones. Usar undo |
+| Mismo color donde no debe | Batch-apply por hex no distingue contexto | Aplicar por CONTEXTO primero, hex match solo como fallback |
+| Cuadros negros en placeholders | Fills IMAGE ignorados | Escanear ALL fill types (SOLID + IMAGE) |
+| Texto invisible en botones | Texto y fondo del mismo color | Verificar contraste en variantes hover/active |
+| Colores intencionales cambiados | Se "arreglaron" colores que eran correctos | Comparar con referencia antes de cambiar |
+
+## Arquitectura: Como Interactuan los Skills
+
+```
+Prompt del usuario → figma-sync (orquestador)
+                       ├── "implementa este frame" → flujo Figma→Code
+                       ├── "actualiza figma"        → flujo Code→Figma
+                       ├── "normaliza"              → normalization-pipeline
+                       ├── "audita"                 → design-normalizer
+                       ├── "que cambio"             → drift-detection
+                       └── "mapea componentes"      → code-connect-bridge
+```
+
+Todos los skills se adaptan al proyecto destino leyendo:
+1. El archivo Figma activo — estructura, componentes, tokens existentes
+2. El CLAUDE.md del proyecto destino — convenciones, stack, reglas
+3. El codigo del proyecto — componentes, props, estilos
+
+## Referencia de Herramientas Figma Console
+
+**Operaciones sobre nodes:** `figma_create_child`, `figma_delete_node`, `figma_rename_node`, `figma_move_node`, `figma_resize_node`, `figma_clone_node`, `figma_set_text`, `figma_set_fills`, `figma_set_strokes`
+
+**Componentes:** `figma_instantiate_component`, `figma_search_components`, `figma_get_component_details`, `figma_set_instance_properties`
+
+**Variables/tokens:** `figma_setup_design_tokens` (crear coleccion + modes + variables en UNA llamada), `figma_batch_create_variables` (hasta 100), `figma_batch_update_variables`
+
+**Lectura:** `figma_get_status`, `figma_get_selection`, `figma_get_file_data`, `figma_lint_design`, `figma_capture_screenshot`
+
+## Troubleshooting
+
+**"No conecta a Figma Desktop"**: Verificar que el plugin Desktop Bridge esta corriendo (punto verde). Buscar procesos zombi: `lsof -i :9223`. Matar y reiniciar si es necesario.
+
+**"Las escrituras fallan pero las lecturas funcionan"**: Las escrituras necesitan el plugin Desktop Bridge (WebSocket). Las lecturas usan REST API (token). Verificar que el plugin este corriendo en Figma Desktop.
+
+**"Conflicto de puerto"**: `kill $(lsof -t -i :9223)` y reiniciar Claude Code.
+
+## Adopcion en Proyectos Nuevos
+
+Ver `docs/how-to-adopt.md` para la guia completa. Quick start:
 1. Copiar `.claude/skills/` a tu proyecto
-2. Configurar `figma-console-mcp` con tu Figma Personal Access Token
+2. Configurar `figma-console-mcp` con tu Figma PAT
 3. Abrir el plugin Desktop Bridge en tu archivo de Figma
-4. (Opcional) Crear `.claude/skills/ui-framework-patterns/SKILL.md` con patrones especificos de tu framework UI
-5. Ejecutar `/design-normalizer` para auditar el estado actual de tu Figma
-
-Ver `docs/how-to-adopt.md` para la guia completa.
+4. Ejecutar `/design-normalizer` para auditar el estado actual

@@ -1,139 +1,160 @@
-# FigmaSync — Sistema de Agentes para Sincronizacion Bidireccional Figma ↔ Codigo
+# FigmaSync
 
-## Vision
+Toolkit de agentes AI para sincronizacion bidireccional Figma <-> Codigo.
+No es una app — son skills que Claude Code interpreta para operar sobre Figma.
+Funciona con **cualquier** proyecto, framework o libreria UI.
 
-Sistema de agentes AI que mantiene sincronizados los disenos de Figma con el codigo en produccion,
-normaliza archivos de diseno, detecta drift visual y establece puentes automaticos entre
-componentes de Figma y componentes de codigo.
+## Prerequisitos
 
-## Problema que resuelve
+- [Claude Code](https://claude.ai/code) instalado
+- Figma Desktop (NO web app)
+- Figma Personal Access Token (PAT)
+- Plugin Desktop Bridge corriendo en Figma (punto verde)
 
-```
-ANTES (flujo roto):
-  Diseno Figma → Codigo → Ajustes en prod → Figma queda desactualizado
-                                                    ↑ BRECHA
+## Quick Start
 
-DESPUES (flujo sincronizado):
-  Figma ←──────────→ Codigo ←──────────→ Produccion
-       get_design_context    generate_figma_design
-       Code Connect          Drift Detection
-```
+```bash
+# 1. Copiar skills a tu proyecto
+cp -r .claude/skills/ ~/tu-proyecto/.claude/skills/
 
-## Arquitectura del Sistema
+# 2. Configurar figma-console-mcp (escritura)
+claude mcp add figma-console -- npx -y figma-console-mcp@latest
 
-```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                          FIGMA SYNC SYSTEM                                │
-│                                                                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                   │
-│  │   NORMALIZER  │  │  SYNC AGENT  │  │   DRIFT      │                   │
-│  │   AGENT       │  │              │  │   DETECTOR   │                   │
-│  │              │  │  Figma→Code  │  │              │                   │
-│  │  Tokens      │  │  Code→Figma  │  │  Screenshots │                   │
-│  │  Artboards   │  │  Bidireccional│  │  Comparacion │                   │
-│  │  Components  │  │              │  │  Reportes    │                   │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘                   │
-│         │                 │                  │                            │
-│  ┌──────┴─────────────────┴──────────────────┴───────┐                   │
-│  │              CODE CONNECT BRIDGE                   │                   │
-│  │   Mapeo automatico: Figma Node ↔ React Component  │                   │
-│  └───────────────────────┬───────────────────────────┘                   │
-│                          │                                                │
-│  ┌───────────────────────┴───────────────────────────────────────────┐   │
-│  │                    HERRAMIENTAS MCP (3 capas)                      │   │
-│  │                                                                    │   │
-│  │  Figma Console (ESCRITURA):  Figma Remote (LECTURA):  GitNexus:   │   │
-│  │  ├─ figma_execute            ├─ get_design_context    ├─ impact    │   │
-│  │  ├─ figma_create_child       ├─ generate_figma_design ├─ context   │   │
-│  │  ├─ figma_set_text           ├─ get_metadata          ├─ query     │   │
-│  │  ├─ figma_move_node          ├─ get_variable_defs     └─ detect    │   │
-│  │  ├─ figma_delete_node        ├─ get_screenshot                    │   │
-│  │  ├─ figma_rename_node        ├─ create_design_system_rules        │   │
-│  │  ├─ figma_resize_node        ├─ get_code_connect_suggestions      │   │
-│  │  ├─ figma_set_fills          └─ send_code_connect_mappings        │   │
-│  │  ├─ figma_clone_node                                              │   │
-│  │  ├─ figma_instantiate_component                                   │   │
-│  │  ├─ figma_setup_design_tokens                                     │   │
-│  │  ├─ figma_batch_create_variables                                  │   │
-│  │  ├─ figma_lint_design                                             │   │
-│  │  └─ figma_get_selection (59+ tools total)                         │   │
-│  └───────────────────────────────────────────────────────────────────┘   │
-└──────────────────────────────────────────────────────────────────────────┘
+# 3. Configurar Figma Remote (lectura via REST API)
+claude mcp add --transport http figma-remote https://mcp.figma.com/mcp
+
+# 4. Abrir Desktop Bridge en tu archivo Figma → verificar punto verde
+
+# 5. Auditar el archivo
+/design-normalizer
 ```
 
-## Estructura del Repositorio
+## Pipeline de Normalizacion (orden estricto)
+
+Para normalizar un archivo Figma desordenado, ejecutar **en este orden**:
+
+### Paso 1: Auditoria
+```
+/design-normalizer
+```
+Escanea el archivo completo. Genera score 0-100 con inventario de colores, tipografia, spacing, layers genericos, y problemas de nesting.
+
+### Paso 2: Limpieza Estructural
+```
+/normalization-pipeline  (fase 1)
+```
+Renombra layers genericos ("Frame 123" → nombres semanticos), aplana nesting excesivo, organiza paginas, elimina orphans.
+
+### Paso 3: Tokenizacion
+```
+/token-sync
+```
+Extrae los colores **reales del diseno** (no del codigo), crea colecciones Primitives + Semantic, y aplica variables a todos los nodos. La apariencia visual NO cambia.
+
+### Paso 4: Auto Layout
+```
+/normalization-pipeline  (fase 3)
+```
+Convierte layouts de posicion absoluta a Auto Layout (Flexbox). Bottom-up: atomos → contenedores → secciones → paginas.
+
+### Paso 5: Componentizacion
+```
+/component-library-sync
+```
+Identifica patrones repetidos, extrae componentes, crea pagina Design System, reemplaza copias con instancias.
+
+### Paso 6: Validacion
+```
+/figma-quality-gate
+```
+Verifica naming, Auto Layout, tokens, consistencia. Score objetivo: >80/100.
+
+> **REGLA:** Tokens ANTES de componentes. Siempre.
+> **REGLA:** Fuente de verdad de colores = el diseno, NUNCA el codigo.
+> **REGLA:** Checkpoint visual despues de cada paso. Si algo se ve mal → Cmd+Z.
+> **REGLA:** Mismo hex ≠ mismo significado. Revisar componente por componente despues del batch-apply.
+> **REGLA:** NUNCA borrar colecciones sin limpiar bindings primero. Preferir undo.
+> **REGLA:** Copiar componentes locales como referencia ANTES de tokenizar para comparar despues.
+
+## Errores Comunes en Tokenizacion
+
+| Error | Causa | Prevencion |
+|-------|-------|------------|
+| Colores no coinciden con el diseno | Se usaron colores del codigo en vez del archivo Figma | SIEMPRE escanear hex reales del archivo |
+| Nodos se ven negros/oscuros | Se borraron colecciones y quedaron bindings huerfanas | Hacer undo en vez de borrar+recrear |
+| Mismo color aplicado donde no debe | Batch-apply por hex no distingue contexto semantico | Revisar cada componente post-aplicacion |
+| Cuadros negros en placeholders | Fills tipo IMAGE no detectados (solo se buscaron SOLID) | Buscar todos los fill types, no solo SOLID |
+| Texto invisible en botones hover | Texto y fondo del mismo color | Verificar contraste en variantes hover/active |
+| Dark mode innecesario | Se crearon modes Light+Dark sin necesidad | Solo Light mode salvo indicacion explicita |
+
+## Todos los Skills (11)
+
+| Skill | Tipo | Descripcion |
+|-------|------|-------------|
+| `/normalization-pipeline` | Write | Pipeline completo de normalizacion (6 fases) |
+| `/design-normalizer` | Read | Auditoria con score 0-100 |
+| `/token-sync` | Write | Crear y aplicar design tokens |
+| `/component-library-sync` | Write | Organizar componentes en Design System |
+| `/screen-creator` | Write | Crear pantallas clonando hermanas |
+| `/variant-generator` | Write | Generar variantes desde props del codigo |
+| `/figma-sync` | Both | Orquestador bidireccional Figma ↔ Codigo |
+| `/code-connect-bridge` | Write | Mapear componentes Figma → codigo |
+| `/drift-detection` | Read | Comparar Figma vs produccion |
+| `/figma-quality-gate` | Read | Validacion post-creacion |
+| `/ui-framework-patterns` | Ref | Patrones CRUD por framework |
+
+## Arquitectura
 
 ```
-figmaSync/
-├── README.md                          # Este archivo
-├── plans/
-│   ├── 01-design-normalizer.md        # Plan: Normalizacion de archivos Figma
-│   ├── 02-bidirectional-sync.md       # Plan: Sincronizacion bidireccional
-│   ├── 03-drift-detection.md          # Plan: Deteccion de diferencias
-│   └── 04-code-connect-bridge.md      # Plan: Puente Code Connect
-├── skills/
-│   ├── figma-sync/
-│   │   └── skill.md                   # Skill principal de orquestacion
-│   ├── design-normalizer/
-│   │   └── skill.md                   # Skill de normalizacion
-│   ├── drift-detection/
-│   │   └── skill.md                   # Skill de deteccion de drift
-│   └── code-connect-bridge/
-│       └── skill.md                   # Skill de Code Connect
-├── architecture/
-│   ├── system-overview.md             # Arquitectura general
-│   ├── mcp-tools-reference.md         # Referencia de herramientas MCP
-│   └── data-flow.md                   # Flujo de datos entre agentes
-├── workflows/
-│   ├── new-feature.md                 # Workflow: feature nueva
-│   ├── production-hotfix.md           # Workflow: hotfix en prod
-│   ├── design-audit.md               # Workflow: auditoria de diseno
-│   └── onboarding-project.md         # Workflow: onboarding proyecto nuevo
-└── templates/
-    ├── design-system-rules.md         # Template para reglas de design system
-    ├── drift-report.md                # Template para reportes de drift
-    └── figma-file-structure.md        # Template para estructurar archivos Figma
+┌──────────────────────────────────────────────────────────────┐
+│                     FIGMA SYNC SYSTEM                         │
+│                                                               │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
+│  │  NORMALIZER   │  │  SYNC AGENT  │  │   DRIFT      │       │
+│  │  + PIPELINE   │  │              │  │   DETECTOR   │       │
+│  │              │  │  Figma→Code  │  │              │       │
+│  │  Audit       │  │  Code→Figma  │  │  Screenshots │       │
+│  │  Cleanup     │  │  Bidireccional│  │  Comparacion │       │
+│  │  Tokenize    │  │              │  │  Reportes    │       │
+│  │  Auto Layout │  │              │  │              │       │
+│  │  Componentize│  │              │  │              │       │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘       │
+│         │                 │                  │                │
+│  ┌──────┴─────────────────┴──────────────────┴──────┐       │
+│  │              CODE CONNECT BRIDGE                  │       │
+│  │   Mapeo automatico: Figma Node ↔ Code Component  │       │
+│  └──────────────────────┬───────────────────────────┘       │
+│                          │                                    │
+│  ┌───────────────────────┴─────────────────────────────┐    │
+│  │               HERRAMIENTAS MCP (3 capas)             │    │
+│  │                                                       │    │
+│  │  figma-console-mcp     Figma Remote      GitNexus    │    │
+│  │  (WebSocket:9223)      (REST API)        (Local)     │    │
+│  │  ESCRITURA             LECTURA           ANALISIS    │    │
+│  └───────────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-## Requisitos
+- **figma-console-mcp** (WebSocket): operaciones de escritura via Plugin API
+- **Figma Remote** (HTTP REST): operaciones de lectura via PAT token
+- **GitNexus** (local, opcional): analisis de impacto en codigo
 
-### Herramientas MCP necesarias
+## Troubleshooting
 
-| MCP | Tipo | Funcion | Setup |
-|-----|------|---------|-------|
-| **Figma Console** | Local (WebSocket) | ESCRITURA: crear, mover, eliminar, renombrar nodes | `claude mcp add figma-console -s user -e FIGMA_ACCESS_TOKEN=figd_XXX -e ENABLE_MCP_APPS=true -- npx -y figma-console-mcp@latest` |
-| **Figma Remote** | HTTP (Cloud) | LECTURA: metadata, screenshots, design context, Code Connect | `claude mcp add --transport http figma-remote https://mcp.figma.com/mcp` |
-| **GitNexus** | Local | Analisis de impacto en codigo | Ya configurado en el proyecto |
-| **Claude Preview** | Local | Captura de localhost para Code→Figma | Opcional |
+| Problema | Solucion |
+|----------|----------|
+| Plugin muestra punto amarillo | Cerrar y re-abrir Desktop Bridge |
+| No conecta a Figma Desktop | `lsof -i :9223` — matar procesos zombi |
+| Escrituras fallan, lecturas ok | Desktop Bridge no esta corriendo |
+| Conflicto de puerto | `kill $(lsof -t -i :9223)` y reiniciar Claude Code |
+| Colores cambiaron al tokenizar | Los hex de las variables no coinciden con el diseno. Undo y re-escanear |
 
-### Setup de Figma Console (Plugin Desktop Bridge)
+## Adopcion en Proyectos Nuevos
 
-1. Instalar MCP server: usar comando de la tabla arriba
-2. Abrir Figma Desktop (NO la web app)
-3. Importar plugin: Plugins > Development > Import plugin from manifest
-   - Ruta del manifest: ejecutar `npx figma-console-mcp@latest --print-path`
-4. Ejecutar plugin en el archivo Figma que quieras editar
-5. Verificar conexion: el plugin muestra "MCP ready" (punto verde)
+Ver `docs/how-to-adopt.md` para la guia detallada.
 
-### Conexion verificada
+## Proyectos Compatibles
 
-```
-Figma Desktop ←──WebSocket:9223──→ figma-console-mcp ←──→ Claude Code
-                 (Plugin Bridge)      (Node.js server)      (MCP client)
-
-Token PAT ──→ REST API ──→ LECTURA (metadata, variables, screenshots)
-Plugin    ──→ Plugin API ──→ ESCRITURA (crear, mover, eliminar, renombrar)
-```
-
-## Como usar
-
-1. **Copiar skills** al proyecto destino: `cp -r skills/* /tu-proyecto/.claude/skills/`
-2. **Adaptar templates** segun tu stack (Next.js, Vue, etc.)
-3. **Ejecutar workflows** segun el caso de uso
-4. **Verificar** que figma-console-mcp esta conectado antes de operaciones de escritura
-
-## Proyectos compatibles
-
-Disenado para funcionar con cualquier proyecto frontend. Probado inicialmente con:
-- **CMS Oasis Hoteles** — Next.js 15, React 19, Ant Design 5 (proyecto activo)
-- **Oasis Hoteles** — Next.js 14, React 18, TailwindCSS, next-intl
+Funciona con cualquier proyecto frontend. Probado con:
+- **CMS Oasis Hoteles** — Next.js 15, React 19, Ant Design 5
+- **Oasis Hoteles** — Next.js 14, React 18, TailwindCSS

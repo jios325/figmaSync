@@ -28,6 +28,12 @@ Registra, organiza y mantiene la libreria de componentes locales en la pagina "D
 
 > Todo componente creado durante el diseño de pantallas DEBE registrarse en la libreria local. Si no esta en Design System, no existe.
 
+## Prerequisito
+
+> Los tokens DEBEN estar aplicados ANTES de componentizar.
+> Si el archivo no tiene variables de color aplicadas, ejecutar `/token-sync` primero.
+> Componentes sin tokens = componentes que habra que re-hacer cuando se tokenice.
+
 ## Estructura de la pagina Design System
 
 ```

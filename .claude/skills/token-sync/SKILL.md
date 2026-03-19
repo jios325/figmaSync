@@ -20,6 +20,208 @@ tools:
 # Token Sync
 
 Sincronizacion bidireccional de design tokens entre Figma y codigo.
+Tambien soporta flujo "design-only" para tokenizar archivos sin proyecto de codigo.
+
+## Regla Critica
+
+> La fuente de verdad de colores es SIEMPRE el diseno, NUNCA el codigo.
+> Extraer los hex reales del archivo Figma. No inventar colores de paletas estandar.
+
+## Flujo Design-Only (sin codigo)
+
+Cuando el archivo Figma no tiene proyecto de codigo asociado, o se esta normalizando desde cero:
+
+### Paso 1: Escanear colores reales del archivo
+
+```javascript
+// figma_execute: traverse ALL nodes, extract unique hex values with counts
+const colorMap = {};
+function toHex(c) { return `#${Math.round(c.r*255).toString(16).padStart(2,'0')}${Math.round(c.g*255).toString(16).padStart(2,'0')}${Math.round(c.b*255).toString(16).padStart(2,'0')}`.toUpperCase(); }
+function scan(node) {
+  if ('fills' in node && Array.isArray(node.fills)) {
+    for (const f of node.fills) {
+      if (f.type === 'SOLID' && f.color && f.visible !== false) {
+        const hex = toHex(f.color);
+        colorMap[hex] = (colorMap[hex] || 0) + 1;
+      }
+    }
+  }
+  if ('children' in node) node.children.forEach(scan);
+}
+figma.root.children.forEach(p => p.children.forEach(scan));
+// Sort by count, return top colors
+```
+
+### Paso 2: Crear coleccion Primitives
+
+Solo Light mode por defecto. Incluir TODOS los colores del archivo:
+```
+figma_setup_design_tokens({
+  collectionName: "Primitives",
+  modes: ["Default"],
+  tokens: [/* uno por cada hex unico, agrupado por familia */]
+})
+```
+
+Naming convention para Primitives:
+- `color/black`, `color/white`
+- `color/neutral/N` (grises ordenados de claro a oscuro)
+- `color/blue/N`, `color/red/N`, `color/green/N` (por familia)
+- `color/corpo/*` (colores corporativos)
+- `color/brand/*` (colores de marca: gold, navy, etc.)
+
+### Paso 3: Crear coleccion Semantic
+
+Mapear colores por USO, no por valor:
+```
+figma_setup_design_tokens({
+  collectionName: "Semantic",
+  modes: ["Default"],
+  tokens: [
+    // Backgrounds
+    { name: "color/bg/page", values: { Default: "#F0F0F0" } },
+    { name: "color/bg/primary", values: { Default: "#FFFFFF" } },
+    // Text
+    { name: "color/text/primary", values: { Default: "#262626" } },
+    // Borders, Actions, Feedback, Brand...
+  ]
+})
+```
+
+### Paso 4: Aplicar variables a todos los nodos (batch por pagina)
+
+```javascript
+// figma_execute (UNO POR PAGINA para evitar timeout de 30s)
+// 1. Build hex → variable map (Semantic priority, then Primitives)
+// 2. Traverse all nodes recursively
+// 3. For each SOLID fill without existing binding:
+//    setBoundVariableForPaint(fill, 'color', matchedVariable)
+// 4. NUNCA cambiar el valor hex — solo vincular la variable
+```
+
+**CRITICO:** La apariencia visual NO debe cambiar. Cada hex se vincula a una variable con el MISMO valor hex.
+
+### Paso 5: Revision post-aplicacion por componente
+
+Despues del batch-apply, revisar visualmente CADA componente de la libreria local:
+- Comparar con la copia de referencia del archivo fuente
+- Buscar textos invisibles (texto del mismo color que el fondo)
+- Buscar placeholders de imagen negros (fills tipo IMAGE, no solo SOLID)
+- Un mismo hex puede tener usos correctos e incorrectos — el batch-apply no distingue contexto
+
+### Paso 6: Verificar
+
+Screenshot de 3+ pantallas. Deben verse IDENTICAS a antes de tokenizar.
+
+## Errores Conocidos a Evitar
+
+### 1. NUNCA usar colores del codigo como fuente de verdad
+Los colores del codigo (Ant Design, Tailwind, etc.) pueden diferir del diseno.
+Siempre escanear los hex reales del archivo Figma con `figma_execute`.
+
+### 2. Mismo hex ≠ mismo significado semantico
+Un color como `#364546` puede usarse para:
+- Sidebar → correcto, es el color corpo
+- Botones → correcto, es intencional
+- Tabs inactivos → **error del diseno**, deberia ser transparente
+- Labels de idioma → **error del diseno**, deberia ser gris
+
+El batch-apply vincula TODOS los `#364546` a la misma variable.
+Despues de aplicar, revisar componente por componente si el color es correcto en ese contexto.
+
+### 3. Referencias huerfanas al borrar colecciones
+Si se borran colecciones de variables, las bindings en los nodos **permanecen como referencias huerfanas**.
+Figma renderiza esos nodos como **negro/oscuro**.
+Solucion: SIEMPRE hacer undo en Figma en vez de borrar colecciones y re-crear.
+Si hay que borrar: primero limpiar bindings de TODOS los nodos con `VariableID:XXX:*`.
+
+### 4. Fills de tipo IMAGE no se detectan con scan de SOLID
+El scan de colores solo detecta `f.type === 'SOLID'`.
+Los placeholders de imagen usan `f.type === 'IMAGE'` y aparecen como cuadros negros.
+Despues de tokenizar, buscar nodos con IMAGE fills > 50px y verificar si son placeholders.
+
+### 5. Texto invisible en variantes hover
+Si un boton hover tiene fondo oscuro y texto del mismo color → texto invisible.
+Despues de tokenizar, verificar que las variantes hover/active de botones tengan contraste correcto.
+
+### 6. Solo Light mode salvo indicacion explicita
+NO crear Dark mode a menos que el diseno original lo tenga.
+Dark mode agrega complejidad innecesaria y duplica el trabajo de verificacion.
+
+## Aplicacion por Contexto (recomendado sobre batch-apply por hex)
+
+El batch-apply por hex causa el error "mismo hex, diferente significado".
+La aplicacion por contexto resuelve esto aplicando variables segun el ROL del nodo.
+
+### Paso 1: Clasificar nodos por rol
+
+```javascript
+// figma_execute: traverse nodes, classify by name/structure/type
+function classifyNode(node) {
+  const name = node.name.toLowerCase();
+  const parentName = node.parent?.name?.toLowerCase() || '';
+
+  // Por nombre
+  if (name.includes('sidebar') || name.includes('side bar')) return 'sidebar';
+  if (name.includes('header') || name.includes('base bar')) return 'header';
+  if (name.includes('divisor') || name.includes('divider')) return 'divider';
+  if (name.includes('bg') || name.includes('background')) return 'background';
+  if (name.includes('upload') || name.includes('image')) return 'placeholder';
+
+  // Por tipo y estructura
+  if (node.type === 'TEXT') {
+    if (node.fontSize >= 20) return 'text-title';
+    if (node.fontSize >= 14) return 'text-primary';
+    return 'text-secondary';
+  }
+
+  // Por contexto del padre
+  if (parentName.includes('tab') || parentName.includes('menu')) return 'navigation';
+  if (parentName.includes('button') || parentName.includes('btn')) return 'button';
+
+  // Frame principal (pantalla completa)
+  if (node.type === 'FRAME' && node.width >= 1440) return 'page-frame';
+
+  // Placeholder (rectangulo pequeno con fill oscuro)
+  if ((node.type === 'RECTANGLE' || node.type === 'FRAME') &&
+      node.width < 300 && node.height < 300) return 'possible-placeholder';
+
+  return 'unclassified'; // → ira al batch-apply residual
+}
+```
+
+### Paso 2: Aplicar variable segun rol
+
+| Rol | Variable Semantica | Accion |
+|-----|-------------------|--------|
+| sidebar | `color/bg/sidebar` | Aplicar variable |
+| header | `color/brand/corpo` | Aplicar variable |
+| divider | `color/border/default` | Aplicar variable |
+| background | `color/bg/primary` o `color/bg/elevated` | Aplicar segun brillo |
+| placeholder | `color/neutral/placeholder` | Cambiar fill a gris #BFBFBF |
+| text-title | `color/text/title` | Aplicar variable |
+| text-primary | `color/text/primary` | Aplicar variable |
+| text-secondary | `color/text/secondary` | Aplicar variable |
+| navigation | **NO TOCAR** | Verificar manualmente |
+| button | **NO TOCAR** | Los botones con fill oscuro son intencionales |
+| page-frame | `color/bg/page` | Aplicar variable |
+| possible-placeholder | **VERIFICAR** | Puede ser placeholder o elemento intencional |
+| unclassified | Batch-apply por hex | Fallback al metodo clasico |
+
+### Paso 3: Batch-apply RESIDUAL
+
+Solo para nodos clasificados como `unclassified` en Paso 1.
+Estos son los unicos que se aplican por hex match (metodo clasico).
+Despues de esta fase, verificar manualmente los nodos afectados.
+
+### Paso 4: Verificacion
+
+Comparar cada componente con la copia de referencia.
+Buscar: textos invisibles, placeholders negros, colores incorrectos.
+
+---
+
+## Flujo Bidireccional (con codigo)
 
 ## Discovery Phase
 
