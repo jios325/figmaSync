@@ -199,6 +199,193 @@ El Plugin API de Figma tiene acceso TOTAL al documento:
 6. `generate_figma_design` necesita que el servidor local este corriendo
 7. El plugin Desktop Bridge debe estar abierto en el archivo Figma que se quiere editar
 8. Solo UN archivo Figma activo por conexion WebSocket (cambiar con `figma_navigate`)
+# Flujo de Ejecucion — Skills + MCP Tools
+
+## Setup Minimo (sin Desktop Bridge)
+
+```bash
+# Solo necesitas esto:
+claude mcp add --transport http figma-remote https://mcp.figma.com/mcp
+```
+
+Esto habilita: `use_figma` (escritura), `get_metadata`, `get_screenshot`, `get_design_context`, `get_variable_defs`, `search_design_system`, `get_code_connect_*`, `create_new_file`, `whoami`.
+
+**Desktop Bridge es OPCIONAL.** Solo necesario si quieres `figma_lint_design` y `figma_capture_screenshot` (real-time).
+
+## Flujo Completo: Normalizar una LIBRERIA
+
+```
+Usuario: "normaliza esta libreria: [URL de Figma]"
+
+PASO 0 — DETECCION (figma-sync)
+├── get_metadata(nodeId, fileKey)        ← MCP READ: estructura del archivo
+├── Contar: symbols/components vs frames con width >= 1440
+└── Resultado: TIPO = LIBRERIA (componentes > pantallas × 2)
+
+PASO 1 — AUDITORIA (/design-normalizer)
+├── get_metadata("pageId", fileKey)      ← MCP READ: estructura completa
+├── use_figma(fileKey, scanColorsScript)  ← MCP WRITE: traverse nodos, extraer hex
+├── get_variable_defs(nodeId, fileKey)    ← MCP READ: tokens existentes
+├── get_screenshot(nodeId, fileKey)       ← MCP READ: referencia visual
+└── OUTPUT: score 0-100, inventario colores, conteo componentes
+
+PASO 2 — CONSOLIDAR DUPLICADOS
+├── get_metadata por cada componente      ← MCP READ: comparar estructura
+├── use_figma(fileKey, mergeScript)       ← MCP WRITE: combinar en component sets
+└── use_figma(fileKey, renameScript)      ← MCP WRITE: "Property 1=Default" → "State=Default"
+
+PASO 3 — TOKENIZACION (/token-sync)
+├── use_figma(fileKey, scanAllFills)      ← MCP WRITE: escanear hex reales
+├── use_figma(fileKey, createPrimitives)  ← MCP WRITE: crear coleccion Primitives
+├── use_figma(fileKey, createSemantic)    ← MCP WRITE: crear coleccion Semantic con aliases
+├── use_figma(fileKey, applyByContext)    ← MCP WRITE: aplicar variables por contexto
+├── get_screenshot(nodeId, fileKey)       ← MCP READ: verificar que no cambio la apariencia
+└── OUTPUT: colecciones creadas, % coverage
+
+PASO 4 — AUTO LAYOUT
+├── use_figma(fileKey, autoLayoutAtoms)   ← MCP WRITE: atoms (buttons, inputs)
+├── use_figma(fileKey, autoLayoutMols)    ← MCP WRITE: molecules (cards, form fields)
+├── use_figma(fileKey, autoLayoutOrgs)    ← MCP WRITE: organisms (headers, footers)
+└── get_screenshot(nodeId, fileKey)       ← MCP READ: verificar no overlap
+
+PASO 5 — REORGANIZAR ATOMIC DESIGN (/component-library-sync)
+├── use_figma(fileKey, createPages)       ← MCP WRITE: crear paginas Atoms/Molecules/Organisms
+├── use_figma(fileKey, moveComponents)    ← MCP WRITE: mover a pagina correcta
+└── get_metadata(pageId, fileKey)         ← MCP READ: verificar organizacion
+
+PASO 6 — VALIDACION (/figma-quality-gate)
+├── get_metadata(nodeId, fileKey)         ← MCP READ: verificar estructura
+├── get_screenshot(nodeId, fileKey)       ← MCP READ: verificar visual
+└── OUTPUT: score final, issues pendientes
+```
+
+## Flujo Completo: Normalizar un PROYECTO
+
+```
+Usuario: "normaliza este proyecto: [URL de Figma]"
+
+PASO 0 — DETECCION (figma-sync)
+├── get_metadata(nodeId, fileKey)        ← MCP READ
+└── Resultado: TIPO = PROYECTO (pantallas >= componentes)
+
+PASO 1 — AUDITORIA (/design-normalizer)
+├── get_metadata + use_figma(scan)       ← MCP READ + WRITE
+└── OUTPUT: score 0-100
+
+PASO 2 — LIMPIEZA ESTRUCTURAL
+├── use_figma(fileKey, renameGenerics)   ← MCP WRITE: "Frame 123" → nombre semantico
+├── use_figma(fileKey, flattenNesting)   ← MCP WRITE: aplanar grupos innecesarios
+└── use_figma(fileKey, organizePages)    ← MCP WRITE: renombrar paginas
+
+PASO 3 — TOKENIZACION (/token-sync)
+├── use_figma(fileKey, scanHex)          ← MCP WRITE: escanear colores reales
+├── use_figma(fileKey, createTokens)     ← MCP WRITE: Primitives + Semantic
+├── use_figma(fileKey, applyTokens)      ← MCP WRITE: aplicar por contexto
+└── get_screenshot(nodeId, fileKey)      ← MCP READ: verificar visual identico
+
+PASO 4 — AUTO LAYOUT
+├── use_figma(fileKey, autoLayout)       ← MCP WRITE: bottom-up
+└── get_screenshot(nodeId, fileKey)      ← MCP READ: verificar
+
+PASO 5 — COMPONENTIZACION (/component-library-sync)
+├── search_design_system(query, fileKey) ← MCP READ: buscar en librerias publicadas
+├── use_figma(fileKey, replaceWithLib)   ← MCP WRITE: reemplazar locals por instancias
+├── use_figma(fileKey, organizeDS)       ← MCP WRITE: mover a pagina Design System
+└── get_metadata(pageId, fileKey)        ← MCP READ: verificar
+
+PASO 6 — VALIDACION (/figma-quality-gate)
+├── get_metadata + get_screenshot        ← MCP READ
+└── OUTPUT: score final
+```
+
+## Flujo: Implementar Diseno (Figma → Code)
+
+```
+Usuario: "implementa este frame: [URL de Figma]"
+
+1. get_design_context(nodeId, fileKey)    ← MCP READ: codigo referencia + screenshot
+2. search_design_system(query, fileKey)   ← MCP READ: componentes disponibles en libreria
+3. get_code_connect_map(nodeId, fileKey)  ← MCP READ: mapeos componente → codigo
+4. gitnexus_context(componentName)        ← LOCAL: dependencias en el codebase
+5. [Generar/actualizar codigo]            ← Claude Code escribe archivos
+6. gitnexus_impact(componentName)         ← LOCAL: verificar que no rompe nada
+```
+
+## Flujo: Capturar UI (Code → Figma)
+
+```
+Usuario: "actualiza Figma con lo que esta en produccion"
+
+1. [Levantar servidor local]
+2. generate_figma_design(outputMode)      ← MCP WRITE: inicia captura
+3. [Usuario selecciona pantallas]
+4. [Poll captureId hasta completar]       ← MCP READ
+5. get_metadata(pageId, fileKey)          ← MCP READ: verificar frames creados
+```
+
+## Flujo: Crear Pantalla Nueva
+
+```
+Usuario: "crea la pantalla de Users"
+
+1. get_metadata(pageId, fileKey)          ← MCP READ: encontrar pantalla hermana
+2. search_design_system(query, fileKey)   ← MCP READ: componentes de libreria
+3. use_figma(fileKey, cloneSister)        ← MCP WRITE: clonar pantalla hermana
+4. use_figma(fileKey, updateContent)      ← MCP WRITE: cambiar titulo, breadcrumb, datos
+5. get_screenshot(nodeId, fileKey)        ← MCP READ: verificar resultado
+6. /figma-quality-gate                    ← Validacion
+```
+
+## Flujo: Detectar Drift
+
+```
+Usuario: "que diferencias hay entre Figma y produccion?"
+
+1. get_metadata(pageId, fileKey)          ← MCP READ: inventario frames Figma
+2. gitnexus_query("pages routes")         ← LOCAL: inventario rutas en codigo
+3. get_screenshot(nodeId, fileKey)        ← MCP READ: screenshot de Figma
+4. [Capturar screenshot produccion]       ← preview_screenshot o manual
+5. get_variable_defs(nodeId, fileKey)     ← MCP READ: tokens Figma
+6. [Leer tailwind.config]                 ← LOCAL: tokens codigo
+7. gitnexus_detect_changes(scope)         ← LOCAL: cambios recientes
+└── OUTPUT: reporte priorizado CRITICAL/HIGH/MEDIUM/LOW
+```
+
+## Flujo: Mapear Code Connect
+
+```
+Usuario: "mapea los componentes de Figma con el codigo"
+
+1. get_metadata(nodeId, fileKey)                    ← MCP READ: listar componentes
+2. get_code_connect_suggestions(nodeId, fileKey)    ← MCP READ: AI sugiere mapeos
+3. get_context_for_code_connect(nodeId, fileKey)    ← MCP READ: propiedades del componente
+4. gitnexus_query(componentName)                    ← LOCAL: buscar en codebase
+5. [Presentar tabla al usuario para confirmar]
+6. send_code_connect_mappings(mappings)             ← MCP WRITE: guardar mapeos
+7. get_code_connect_map(nodeId, fileKey)             ← MCP READ: verificar
+```
+
+## Referencia Rapida: MCP Tools por Tipo
+
+| Tipo | Tool | Canal |
+|------|------|-------|
+| **WRITE** | `use_figma(fileKey, code, desc)` | Figma Remote (HTTP) |
+| **WRITE** | `figma_execute(code)` | Desktop Bridge (WebSocket) — opcional |
+| **READ** | `get_metadata(nodeId, fileKey)` | Figma Remote |
+| **READ** | `get_screenshot(nodeId, fileKey)` | Figma Remote |
+| **READ** | `get_design_context(nodeId, fileKey)` | Figma Remote |
+| **READ** | `get_variable_defs(nodeId, fileKey)` | Figma Remote |
+| **READ** | `search_design_system(query, fileKey)` | Figma Remote |
+| **READ** | `get_code_connect_map(nodeId, fileKey)` | Figma Remote |
+| **READ** | `get_code_connect_suggestions(nodeId, fileKey)` | Figma Remote |
+| **READ** | `get_context_for_code_connect(nodeId, fileKey)` | Figma Remote |
+| **WRITE** | `send_code_connect_mappings(mappings)` | Figma Remote |
+| **WRITE** | `add_code_connect_map(mapping)` | Figma Remote |
+| **WRITE** | `create_new_file(planKey, fileName, type)` | Figma Remote |
+| **WRITE** | `generate_figma_design(outputMode)` | Figma Remote |
+| **READ** | `whoami()` | Figma Remote |
+| **LOCAL** | `gitnexus_*` | GitNexus (opcional) |
+
 # Flujo de Datos — FigmaSync
 
 ## Diagrama General
