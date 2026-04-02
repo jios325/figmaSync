@@ -135,6 +135,62 @@ add_code_connect_map({
 })
 ```
 
+## Code Connect UI Nativa (2025-2026) — Organization/Enterprise
+
+### Que cambio
+
+Code Connect ahora tiene una **UI nativa** integrada en Figma:
+- **Conexion directa a GitHub:** Se conecta el repo y Figma accede al codigo fuente
+- **AI Suggestions:** Figma sugiere automaticamente que archivo de codigo mapear a cada componente
+- **Snippets auto-generados:** Genera codigo de ejemplo basado en los archivos fuente reales
+- **MCP usage instructions:** Nuevo campo de texto que dice a LLMs como usar el componente
+
+### MCP Usage Instructions
+
+Cuando `get_design_context` retorna un componente con **MCP usage instructions**, estas instrucciones DEBEN RESPETARSE al generar codigo. Contienen:
+- Props requeridos vs opcionales
+- Patrones de uso comunes
+- Restricciones (ej: "no usar size='xl' en mobile")
+- Import path correcto
+
+### Como se complementan
+
+| Tarea | UI Nativa (Figma) | Nuestro MCP Flow |
+|-------|-------------------|------------------|
+| Setup inicial (visual) | Ideal — UI facil para disenadores | Alternativa via CLI |
+| Bulk mapping (50+ components) | Lento (uno por uno) | Ideal — `send_code_connect_mappings` batch |
+| Mantenimiento automatico | Manual | Automatizable via scheduled tasks |
+| Detectar mapeos rotos | No notifica | `get_code_connect_map` + verificar archivos |
+| Escribir MCP usage instructions | Via UI | Via `add_code_connect_map` con template |
+
+**Recomendacion:** Usar UI nativa para el setup visual inicial (mas facil para el equipo de diseno). Usar nuestro MCP flow para automatizacion, mantenimiento bulk, y deteccion de mapeos rotos.
+
+### Escribir MCP Usage Instructions
+
+Al crear mappings avanzados con templates, agregar MCP usage instructions que incluyan:
+
+```
+add_code_connect_map({
+  nodeId: "{nodeId}",
+  fileKey: "{fileKey}",
+  source: "src/components/ui/Button/index.tsx",
+  componentName: "Button",
+  label: "React",
+  template: `<Button variant={figma.enum("Variant", {...})}>{figma.string("Label")}</Button>`,
+  templateDataJson: JSON.stringify({
+    isParserless: true,
+    imports: ["import { Button } from '@/components/ui/Button'"],
+    // MCP usage instructions se definen en el template como comentario o metadata
+  })
+})
+```
+
+Las MCP usage instructions deben incluir:
+1. **Required props:** Que props son obligatorios
+2. **Common patterns:** Patrones de uso mas frecuentes
+3. **Restrictions:** Que NO hacer (ej: no combinar variant="ghost" con size="xl")
+4. **Import path:** Path exacto de importacion
+
 ## Labels por Framework
 
 | Framework | Label | Notas |
@@ -146,6 +202,107 @@ add_code_connect_map({
 | Android | "Compose" o "Kotlin" | Segun el framework |
 | Flutter | "Flutter" | Cross-platform |
 | Vanilla | "Javascript" | Sin framework |
+
+## Templates Parserless Avanzados (API Completa)
+
+### Paso Adicional: Obtener Propiedades del Componente
+
+Antes de crear un template avanzado, obtener las propiedades del componente con:
+```
+get_context_for_code_connect(nodeId: "{componentNodeId}", fileKey: "{fileKey}")
+```
+Retorna: property definitions con tipos, variant options, y arbol de descendientes.
+
+### API de Template
+
+#### Propiedades de Instancia
+```javascript
+// Texto
+instance.getString("Label")                    // Retorna valor de TEXT property
+
+// Booleano
+instance.getBoolean("Show Icon")               // Retorna true/false
+
+// Enum (variants)
+instance.getEnum("Size", {                     // Mapea valores Figma → codigo
+  "Small": "sm",
+  "Medium": "md",
+  "Large": "lg"
+})
+
+// Instance Swap
+instance.getInstanceSwap("Icon")               // Retorna componente swapped
+```
+
+#### Descendants (componentes anidados)
+```javascript
+// Buscar instancia anidada por nombre
+instance.findInstance("Avatar")                // Encuentra child instance "Avatar"
+
+// Buscar texto anidado
+instance.findText("Title")                     // Encuentra child text "Title"
+
+// Buscar instancia con Code Connect
+instance.findConnectedInstance("Badge")        // Solo si Badge tiene Code Connect
+
+// Ejecutar template de componente anidado
+const badge = instance.findConnectedInstance("Badge");
+if (badge && badge.hasCodeConnect()) {
+  badge.executeTemplate()                      // Genera el codigo del componente anidado
+}
+```
+
+#### Tagged Templates
+```javascript
+// React/JSX
+figma.tsx`<Button variant={instance.getEnum("Variant", {...})}>{instance.getString("Label")}</Button>`
+
+// HTML
+figma.html`<button class="${instance.getEnum("Size", {...})}">${instance.getString("Label")}</button>`
+
+// Kotlin (Compose)
+figma.kotlin`Button(text = ${instance.getString("Label")})`
+```
+
+#### Ejemplo Completo de .figma.js
+```javascript
+// Button.figma.js
+import figma from "@figma/code-connect";
+
+figma.connect("https://figma.com/design/FILE_KEY/FILE?node-id=NODE_ID", {
+  props: {
+    label: figma.string("Label"),
+    variant: figma.enum("Variant", {
+      "Primary": "primary",
+      "Secondary": "secondary",
+      "Ghost": "ghost"
+    }),
+    size: figma.enum("Size", {
+      "Small": "sm",
+      "Medium": "md",
+      "Large": "lg"
+    }),
+    disabled: figma.boolean("Disabled"),
+    icon: figma.instance("Leading Icon")
+  },
+  example: (props) => (
+    <Button
+      variant={props.variant}
+      size={props.size}
+      disabled={props.disabled}
+    >
+      {props.icon}
+      {props.label}
+    </Button>
+  )
+});
+```
+
+### Reglas Criticas para Templates
+1. **NUNCA** concatenar strings con resultados de template — usar tagged templates
+2. **SIEMPRE** verificar `hasCodeConnect()` antes de `executeTemplate()`
+3. **SIEMPRE** verificar `type === 'INSTANCE'` antes de `hasCodeConnect()`
+4. Los archivos `.figma.js` son alternativa a `add_code_connect_map` para templates complejos
 
 ## Metricas
 

@@ -74,6 +74,9 @@ Evaluar:
 - **Categorias:** Colores, spacing, typography, border-radius, shadows
 - **Hardcoded values:** Buscar hex colors o px values sueltos en el diseno
 
+**Complemento: Check Designs Linter**
+Sugerir al usuario ejecutar "Check Designs" en Figma (via quick action) como complemento a la auditoria automatica. El linter nativo usa un modelo AI que sugiere la variable correcta por contexto, detectando valores raw que deberian ser variables.
+
 ### Paso 4: Auditar Componentes
 
 Para los componentes principales detectados en metadata:
@@ -87,6 +90,15 @@ Evaluar:
 - **Responsive:** Tienen variantes desktop/tablet/mobile?
 - **Auto Layout:** Usan Auto Layout (mapeable a Flexbox)?
 - **Duplicados:** Hay componentes casi-identicos?
+
+**Enriquecimiento con Library Analytics (Enterprise only):**
+Si el proyecto tiene plan Enterprise y scope `library_analytics:read`, enriquecer la auditoria de componentes con datos de uso:
+- Instancias por componente (cuales se usan mas)
+- Detachment rate (cuales se desvinculan frecuentemente — posible signal de que no sirven)
+- Componentes con 0 instancias — candidatos a eliminar
+- Archivos donde se usa cada componente — para entender alcance
+
+Estos datos se recalculan diariamente a 00:00 UTC. Sin Enterprise, omitir esta seccion.
 
 ### Paso 5: Comparar con Codigo (opcional, si hay proyecto de codigo asociado)
 

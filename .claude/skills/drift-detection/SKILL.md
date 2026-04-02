@@ -124,6 +124,30 @@ Asignar prioridad:
 - **MEDIUM:** Pagina individual + diferencia menor
 - **LOW:** Token drift < 5% delta visual
 
+### Paso 8b: Enriquecer con Library Analytics (Enterprise only)
+
+Si el proyecto tiene plan Enterprise y scope `library_analytics:read`:
+
+**Endpoints disponibles:**
+- `GET /v1/analytics/libraries/{file_key}/components/actions` — inserciones, detachments por componente
+- `GET /v1/analytics/libraries/{file_key}/components/usages` — instancias por componente y archivo
+- `GET /v1/analytics/libraries/{file_key}/styles/actions` — uso de estilos
+- `GET /v1/analytics/libraries/{file_key}/styles/usages` — instancias de estilos
+- `GET /v1/analytics/libraries/{file_key}/variables/actions` — uso de variables
+- `GET /v1/analytics/libraries/{file_key}/variables/usages` — instancias de variables
+
+**Como enriquece la priorizacion:**
+| Escenario | Interpretacion | Prioridad |
+|-----------|---------------|-----------|
+| Alto uso (100+ instancias) + drift visual | Componente critico desincronizado | **CRITICAL** |
+| Alto detachment rate (>20%) | Posible drift intencional — equipo desvincula porque el componente no sirve | Investigar antes de priorizar |
+| Bajo uso (<5 instancias) + drift | Componente poco usado, bajo impacto | **LOW** |
+| 0 instancias | Componente no usado — candidato a eliminar | Excluir del reporte de drift |
+
+**Datos:** Recalculados diariamente a 00:00 UTC. Paginados (max 1000 rows por request).
+
+**Fallback sin Enterprise:** Omitir este paso. La priorizacion usa solo `gitnexus_impact` y analisis visual (Pasos 7-8).
+
 ### Paso 9: Generar Reporte
 
 ```markdown
@@ -158,6 +182,11 @@ Asignar prioridad:
 | Token | Figma | Codigo | Accion |
 |---|---|---|---|
 {tabla}
+
+## Datos de Uso — Library Analytics (si Enterprise)
+| Componente | Instancias | Detachments | Trend |
+|---|---|---|---|
+| {nombre} | {N} | {N} ({X}%) | {subiendo/bajando/estable} |
 
 ## Siguientes Pasos
 1. {accion prioritaria 1}
