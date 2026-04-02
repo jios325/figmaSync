@@ -237,6 +237,7 @@ En `scripts/` hay helpers JS reutilizables que se pueden pasar como codigo a `us
 | `createSemanticTokens.js` | Crear variables semanticas con aliases |
 | `validateCreation.js` | Verificar que nodos creados son los esperados |
 | `cleanupOrphans.js` | Limpiar nodos huerfanos por identificador |
+| `layoutPageGrid.js` | Organizar nodos de una pagina en grid sin traslapes |
 
 ## Referencia Rapida: Que Funciona y Que NO
 

@@ -80,6 +80,11 @@ Orden optimizado para archivos de componentes (design system):
    - Atoms: buttons, inputs, icons, tags, badges, arrows
    - Molecules: cards, form fields, search bars, nav items
    - Organisms: headers, footers, menus, faqs, modulos completos
+6b. Layout grid en cada pagina   → Patron de `scripts/layoutPageGrid.js`:
+                                   ordenar por tipo+nombre, grid sin traslapes,
+                                   respetar altura maxima por fila.
+                                   Agrupar organismos por categoria (headers, footers, etc.)
+                                   Secciones grandes (ej: Cards 50+) → reorganizar internamente
 7. /component-library-sync      → Organizar en pagina Design System por categoria
 8. /figma-quality-gate          → Validacion (ajustar: no buscar sidebar/header de pantalla)
 9. Publicar como Library
