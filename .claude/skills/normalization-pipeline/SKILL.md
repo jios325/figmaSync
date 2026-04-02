@@ -255,6 +255,19 @@ Semantic: mapeo por USO/CONTEXTO:
 - `HUG` → elementos con tamaño intrinseco
 - `FIXED` → solo cuando el tamaño NUNCA debe cambiar (ej: sidebar 240px)
 
+**IMPORTANTE — Reorganizar pagina despues de aplicar Auto Layout:**
+Aplicar Auto Layout puede cambiar las dimensiones de frames y componentes, causando traslapes entre elementos a nivel de pagina. Despues de convertir frames a Auto Layout en una pagina, SIEMPRE ejecutar el patron `layoutPageGrid.js` para reorganizar todos los nodos de la pagina en un grid limpio:
+
+```javascript
+// via use_figma: usar el patron de scripts/layoutPageGrid.js
+// Agrupa por tipo (COMPONENT_SET → COMPONENT → SECTION → FRAME)
+// Ordena alfabeticamente dentro de cada grupo
+// Dispone en filas respetando MAX_ROW_WIDTH con GAP_X y GAP_Y
+// Resultado: 0 traslapes entre elementos de la pagina
+```
+
+Aplicar en CADA pagina donde se modificaron frames (Atoms, Molecules, Organisms).
+
 **CHECKPOINT:** Screenshot de cada pantalla convertida. Verificar que no hay overlap.
 
 ---
@@ -382,6 +395,7 @@ Semantic: mapeo por USO/CONTEXTO:
 8. **NUNCA borrar colecciones sin limpiar bindings** — las referencias huerfanas hacen que Figma renderice nodos como negro. Preferir undo sobre borrar+recrear
 9. **Escanear ALL fill types** — no solo SOLID. Los fills IMAGE aparecen como cuadros negros si no se tratan
 10. **Copiar referencia visual ANTES de tokenizar** — duplicar la seccion de componentes locales como referencia para comparar despues del batch-apply
+11. **Reorganizar pagina despues de modificar dimensiones** — aplicar Auto Layout, resize, o crear nodos puede causar traslapes a nivel de pagina. Despues de cada fase que modifica dimensiones, ejecutar `layoutPageGrid.js` para re-acomodar todos los elementos en un grid sin traslapes. Script disponible en `figma-use/scripts/layoutPageGrid.js`
 
 ## Edge Cases
 
