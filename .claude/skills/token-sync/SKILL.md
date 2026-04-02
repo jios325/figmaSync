@@ -15,6 +15,7 @@ tools:
   - figma_batch_update_variables
   - figma_create_variable_collection
   - figma_browse_tokens
+  - use_figma
 ---
 
 # Token Sync
@@ -383,6 +384,78 @@ Figma Variable Collections:
     ├── header/height → 56
     ├── table/row-height → 48
     └── modal/border-radius → radius/sm
+```
+
+## Extended Variable Collections (Theming) — Solo Enterprise
+
+### Cuando usar
+
+- El proyecto tiene multiples marcas (multi-brand / white-labeling)
+- Se necesitan mas de 4 variaciones de tema (limite de modes en Professional)
+- Se quiere herencia de tokens: un tema base + overrides por marca
+
+### Concepto
+
+Las Extended Collections permiten crear una coleccion hija que hereda TODOS los modes y variables de la coleccion padre. Solo se hace override de lo que cambia por tema.
+
+```
+Primitives (Library publicada, base)
+├── Extended: "Brand A" → override color/brand/* con colores de Brand A
+├── Extended: "Brand B" → override color/brand/* con colores de Brand B
+└── Extended: "Brand C" → override color/brand/* con colores de Brand C
+```
+
+### Flujo
+
+1. **Crear coleccion base** (Primitives + Semantic) siguiendo el flujo normal
+2. **Publicar como Library** — REQUISITO: la base debe estar publicada para poder extenderla
+3. **Extender por tema:**
+   ```javascript
+   // use_figma o figma_execute:
+   const extension = await figma.variables.extendLibraryCollectionByKeyAsync(
+     baseCollectionKey,  // key de la coleccion publicada
+     "Brand A"           // nombre del tema
+   );
+   ```
+4. **Override de variables por tema:**
+   ```javascript
+   // Leer valores actuales del tema:
+   const values = await variable.valuesByModeForCollectionAsync(extension);
+   // Modificar solo lo que cambia (ej: color/brand/primary)
+   variable.setValueForMode(modeId, newValue);
+   ```
+5. **Remover override (volver al valor base):**
+   ```javascript
+   variable.removeOverrideForMode(extendedModeId);
+   ```
+
+### Propiedades utiles
+
+- `extension.rootVariableCollectionId` — ID del ancestro raiz (top-most parent)
+- `variable.valuesByModeForCollectionAsync(collection)` — valores resueltos incluyendo overrides
+
+### Limitaciones
+
+- **Solo plan Enterprise.** `extendLibraryCollectionByKeyAsync` lanza error en Professional/Free.
+- La coleccion base DEBE ser una Library publicada.
+- Las extensiones heredan modes — no se pueden agregar modes adicionales en la extension.
+
+### Fallback sin Enterprise
+
+Si el plan es Professional o inferior:
+- Usar **modes dentro de una coleccion** (max 4 en Professional): ej. "Default", "Brand A", "Brand B", "Brand C"
+- O crear **colecciones separadas** por tema (sin herencia automatica, requiere sync manual de cambios)
+
+### Nota sobre canal de escritura
+
+Si `use_figma` es el canal activo (no hay Desktop Bridge), las operaciones de `figma_setup_design_tokens` se traducen a:
+```javascript
+// use_figma equivalente:
+const collection = figma.variables.createVariableCollection("Primitives");
+const mode = collection.modes[0]; // ya tiene un mode por defecto
+collection.renameMode(mode.modeId, "Default");
+const variable = figma.variables.createVariable("color/brand/primary", collection, "COLOR");
+variable.setValueForMode(mode.modeId, { r: 0.21, g: 0.27, b: 0.28, a: 1 });
 ```
 
 ## Output esperado

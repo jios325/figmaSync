@@ -19,7 +19,25 @@ claude mcp add figma-console -s user \
   -- npx -y figma-console-mcp@latest
 ```
 
-## Step 2: Install Desktop Bridge Plugin
+## Step 1b: Alternative — Use Official Figma MCP (no Desktop Bridge needed)
+
+If you don't have Figma Desktop or prefer not to install the Desktop Bridge plugin:
+
+```bash
+claude mcp add --transport http figma-remote https://mcp.figma.com/mcp
+```
+
+This gives you access to `use_figma` for write operations and all read tools. No Desktop app required.
+
+**Trade-offs vs Desktop Bridge:**
+- Fewer dedicated tools (1 generic `use_figma` vs 15+ specialized tools)
+- No `figma_lint_design` or real-time `figma_capture_screenshot`
+- Beta — will be paid in the future
+- Works from any machine without Figma Desktop
+
+See `docs/decisions/05-official-mcp-write-channel.md` for full comparison.
+
+## Step 2: Install Desktop Bridge Plugin (skip if using Step 1b)
 
 1. Open Figma Desktop
 2. Go to **Plugins > Development > Import plugin from manifest...**
@@ -118,18 +136,30 @@ This will:
 
 ## Skill Reference
 
-| Skill | Purpose | Needs Figma Desktop Bridge? |
+| Skill | Purpose | Desktop Bridge | use_figma |
+|---|---|---|---|
+| `figma-sync` | Orchestrator — routes to correct sub-skill | Yes | Yes |
+| `screen-creator` | Create new screens from existing patterns | Yes | Yes |
+| `component-library-sync` | Organize component library | Yes | Yes |
+| `token-sync` | Sync design tokens bidirectionally | Yes | Yes |
+| `ui-framework-patterns` | CRUD patterns for your UI framework | No | No (reference) |
+| `variant-generator` | Generate variants from code props | Yes | Yes |
+| `figma-quality-gate` | Post-creation quality validation | Yes | Partial (no lint) |
+| `design-normalizer` | Audit Figma file health | Read-only | Read-only |
+| `drift-detection` | Compare Figma vs production | Read-only | Read-only |
+| `code-connect-bridge` | Map Figma components to code | Read-only | Read-only |
+| `design-system-health` | DS health dashboard + analytics | Read-only | Read-only |
+
+## Enterprise Features (optional)
+
+These features require specific Figma plans and enrich the toolkit:
+
+| Feature | Required Plan | Skills that Use It |
 |---|---|---|
-| `figma-sync` | Orchestrator — routes to correct sub-skill | Yes |
-| `screen-creator` | Create new screens from existing patterns | Yes |
-| `component-library-sync` | Organize component library | Yes |
-| `token-sync` | Sync design tokens bidirectionally | Yes |
-| `ui-framework-patterns` | CRUD patterns for your UI framework | No (reference only) |
-| `variant-generator` | Generate variants from code props | Yes |
-| `figma-quality-gate` | Post-creation quality validation | Yes |
-| `design-normalizer` | Audit Figma file health | Read-only OK |
-| `drift-detection` | Compare Figma vs production | Read-only OK |
-| `code-connect-bridge` | Map Figma components to code | Read-only + Code Connect API |
+| Extended Variable Collections (theming) | Enterprise | `token-sync`, `normalization-pipeline` |
+| Library Analytics API | Enterprise | `drift-detection`, `design-system-health` |
+| Code Connect UI (native) | Organization+ | `code-connect-bridge` |
+| Check Designs linter | All plans | `figma-quality-gate`, `design-normalizer` |
 
 ## Troubleshooting
 
@@ -151,3 +181,13 @@ Run `/design-normalizer` first — it teaches other skills about your file struc
 ### "Write operations fail but reads work"
 Writes go through the Desktop Bridge plugin (WebSocket). Reads use the REST API (token).
 Make sure the plugin is running in Figma Desktop.
+
+### "use_figma not available"
+Verify Figma Remote MCP is configured:
+```bash
+claude mcp add --transport http figma-remote https://mcp.figma.com/mcp
+```
+Then verify with `whoami` tool.
+
+### "Extended Collections fails"
+Extended Variable Collections requires Enterprise plan. On Professional, use modes within a single collection (max 4 modes).

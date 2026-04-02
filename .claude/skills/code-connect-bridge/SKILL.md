@@ -135,6 +135,62 @@ add_code_connect_map({
 })
 ```
 
+## Code Connect UI Nativa (2025-2026) — Organization/Enterprise
+
+### Que cambio
+
+Code Connect ahora tiene una **UI nativa** integrada en Figma:
+- **Conexion directa a GitHub:** Se conecta el repo y Figma accede al codigo fuente
+- **AI Suggestions:** Figma sugiere automaticamente que archivo de codigo mapear a cada componente
+- **Snippets auto-generados:** Genera codigo de ejemplo basado en los archivos fuente reales
+- **MCP usage instructions:** Nuevo campo de texto que dice a LLMs como usar el componente
+
+### MCP Usage Instructions
+
+Cuando `get_design_context` retorna un componente con **MCP usage instructions**, estas instrucciones DEBEN RESPETARSE al generar codigo. Contienen:
+- Props requeridos vs opcionales
+- Patrones de uso comunes
+- Restricciones (ej: "no usar size='xl' en mobile")
+- Import path correcto
+
+### Como se complementan
+
+| Tarea | UI Nativa (Figma) | Nuestro MCP Flow |
+|-------|-------------------|------------------|
+| Setup inicial (visual) | Ideal — UI facil para disenadores | Alternativa via CLI |
+| Bulk mapping (50+ components) | Lento (uno por uno) | Ideal — `send_code_connect_mappings` batch |
+| Mantenimiento automatico | Manual | Automatizable via scheduled tasks |
+| Detectar mapeos rotos | No notifica | `get_code_connect_map` + verificar archivos |
+| Escribir MCP usage instructions | Via UI | Via `add_code_connect_map` con template |
+
+**Recomendacion:** Usar UI nativa para el setup visual inicial (mas facil para el equipo de diseno). Usar nuestro MCP flow para automatizacion, mantenimiento bulk, y deteccion de mapeos rotos.
+
+### Escribir MCP Usage Instructions
+
+Al crear mappings avanzados con templates, agregar MCP usage instructions que incluyan:
+
+```
+add_code_connect_map({
+  nodeId: "{nodeId}",
+  fileKey: "{fileKey}",
+  source: "src/components/ui/Button/index.tsx",
+  componentName: "Button",
+  label: "React",
+  template: `<Button variant={figma.enum("Variant", {...})}>{figma.string("Label")}</Button>`,
+  templateDataJson: JSON.stringify({
+    isParserless: true,
+    imports: ["import { Button } from '@/components/ui/Button'"],
+    // MCP usage instructions se definen en el template como comentario o metadata
+  })
+})
+```
+
+Las MCP usage instructions deben incluir:
+1. **Required props:** Que props son obligatorios
+2. **Common patterns:** Patrones de uso mas frecuentes
+3. **Restrictions:** Que NO hacer (ej: no combinar variant="ghost" con size="xl")
+4. **Import path:** Path exacto de importacion
+
 ## Labels por Framework
 
 | Framework | Label | Notas |

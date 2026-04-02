@@ -12,14 +12,16 @@ Funciona con CUALQUIER proyecto, framework o libreria UI.
 
 | MCP | Canal | Funcion |
 |-----|-------|---------|
-| **figma-console-mcp** | WebSocket (Plugin API) | ESCRITURA: crear, mover, eliminar, renombrar, redimensionar nodes |
+| **figma-console-mcp** | WebSocket (Plugin API) | ESCRITURA PRIMARIA: crear, mover, eliminar, renombrar, redimensionar nodes |
 | **Figma Remote** | HTTP REST (PAT token) | LECTURA: metadata, screenshots, design context, Code Connect |
+| **Figma Remote (use_figma)** | HTTP REST (Plugin API via MCP) | ESCRITURA ALTERNATIVA: JS Plugin API sin Desktop Bridge. Beta, sera de pago |
 | **GitNexus** | Local (opcional) | Analisis de impacto en codigo, descubrimiento de componentes |
 
 **Arquitectura de conexion:**
 ```
-Figma Desktop <--WebSocket:9223--> figma-console-mcp <--> Claude Code  (ESCRITURA)
-PAT Token --> REST API --> Figma Cloud                                  (LECTURA)
+Figma Desktop <--WebSocket:9223--> figma-console-mcp <--> Claude Code  (ESCRITURA PRIMARIA)
+Figma Cloud  <--HTTP REST--------> use_figma         <--> Claude Code  (ESCRITURA ALTERNATIVA)
+PAT Token    --> REST API --------> Figma Cloud       <--> Claude Code  (LECTURA)
 ```
 
 ## Reglas Criticas
@@ -30,6 +32,20 @@ PAT Token --> REST API --> Figma Cloud                                  (LECTURA
 - `figma_execute` ejecuta JS arbitrario en contexto del plugin — herramienta mas poderosa, usada para operaciones en lote, crear paginas, mover nodes entre paginas
 - Solo 2 operaciones requieren intervencion manual: copiar entre archivos Figma e importar librerias externas
 - Solo UN archivo Figma activo por conexion WebSocket (cambiar con `figma_navigate`)
+
+## Seleccion de Canal de Escritura
+
+Antes de cualquier operacion de escritura, detectar canal disponible:
+
+```
+1. figma_get_status → OK?
+   SI → usar figma-console-mcp (PRIMARIO: 15+ tools dedicados, lint, screenshots real-time)
+   NO → use_figma disponible?
+        SI → usar use_figma (FALLBACK: 1 tool generico con JS Plugin API, sin Desktop Bridge)
+        NO → modo READ-ONLY (informar al usuario como configurar)
+```
+
+**figma-console-mcp** es preferido porque ofrece herramientas dedicadas (figma_setup_design_tokens, figma_lint_design, figma_capture_screenshot) que `use_figma` no tiene. Ver `docs/decisions/05-official-mcp-write-channel.md` para detalles.
 
 ## Parseo de URLs de Figma
 
@@ -42,7 +58,7 @@ Conversion de Node ID: la URL usa "-", los tools usan ":"
   1635-27981 (URL) → 1635:27981 (parametro)
 ```
 
-## Skills (11, todos project-agnostic)
+## Skills (12, todos project-agnostic)
 
 ### Normalizacion
 | Skill | Cuando usar |
@@ -69,6 +85,7 @@ Conversion de Node ID: la URL usa "-", los tools usan ":"
 |-------|-------------|
 | `/drift-detection` | Comparar Figma vs produccion via diff visual + estructural |
 | `/figma-quality-gate` | Checklist de validacion post-creacion |
+| `/design-system-health` | Dashboard de salud: auditoria + Library Analytics + Code Connect coverage |
 | `/ui-framework-patterns` | Patrones de pantallas CRUD por framework UI |
 
 ## Pipeline de Normalizacion (orden estricto)
@@ -110,7 +127,9 @@ Prompt del usuario → figma-sync (orquestador)
                        ├── "normaliza"              → normalization-pipeline
                        ├── "audita"                 → design-normalizer
                        ├── "que cambio"             → drift-detection
-                       └── "mapea componentes"      → code-connect-bridge
+                       ├── "mapea componentes"      → code-connect-bridge
+                       ├── "temas multi-brand"      → token-sync (Extended Collections)
+                       └── "salud design system"    → design-system-health
 ```
 
 Todos los skills se adaptan al proyecto destino leyendo:
@@ -128,6 +147,46 @@ Todos los skills se adaptan al proyecto destino leyendo:
 
 **Lectura:** `figma_get_status`, `figma_get_selection`, `figma_get_file_data`, `figma_lint_design`, `figma_capture_screenshot`
 
+## Referencia de Herramientas Figma Remote (use_figma)
+
+**Escritura alternativa (sin Desktop Bridge):**
+- `use_figma(fileKey, code, description)` — ejecuta JS Plugin API via HTTP. Equivale a `figma_execute` pero no requiere Desktop Bridge.
+- Permite: crear frames, componentes, variables, auto layout, aplicar fills/strokes, instanciar componentes
+- NO permite: lint (`figma_lint_design`), screenshots real-time (`figma_capture_screenshot`)
+- Usar solo cuando figma-console-mcp no esta disponible
+
+## Capacidades Nuevas de Figma (2025-2026)
+
+### Extended Variable Collections (Theming) — Solo Enterprise
+Las colecciones se pueden "extender" para crear temas multi-brand. La coleccion hija hereda modes y variables del padre, con overrides por tema.
+- Plugin API: `figma.variables.extendLibraryCollectionByKeyAsync(collectionKey, name)`
+- Lectura por tema: `variable.valuesByModeForCollectionAsync(collection)`
+- **Requisito:** Plan Enterprise. Base debe ser Library publicada.
+- **Fallback sin Enterprise:** Usar modes dentro de una coleccion (max 4 en Professional)
+
+### Code Connect UI Nativa — Organization/Enterprise
+Code Connect ahora tiene UI nativa en Figma con conexion directa a GitHub.
+- AI sugiere que archivo de codigo mapear a cada componente
+- Genera snippets automaticamente
+- Nuevo campo: **MCP usage instructions** — texto que dice a LLMs como usar el componente
+- Cuando `get_design_context` retorna MCP usage instructions, RESPETARLAS al generar codigo
+- Nuestro `/code-connect-bridge` complementa la UI nativa para automatizacion y bulk
+
+### Library Analytics API — Solo Enterprise
+API REST para datos de uso del design system.
+- Scope requerido: `library_analytics:read`
+- 6 endpoints: components/styles/variables x actions/usages
+- Datos: instancias por componente, detachments, inserciones, archivos de uso
+- Datos recalculados diariamente a 00:00 UTC, paginados (max 1000 rows)
+- Usado por `/drift-detection` y `/design-system-health`
+
+### Check Designs Linter
+Linter nativo de Figma que detecta valores raw que deberian ser variables.
+- Modelo custom sugiere la variable correcta por contexto
+- Se activa via quick action o al marcar "ready for dev"
+- Complementa `figma_lint_design` (que corre via API)
+- Usado como referencia en `/figma-quality-gate` y `/design-normalizer`
+
 ## Troubleshooting
 
 **"No conecta a Figma Desktop"**: Verificar que el plugin Desktop Bridge esta corriendo (punto verde). Buscar procesos zombi: `lsof -i :9223`. Matar y reiniciar si es necesario.
@@ -136,10 +195,14 @@ Todos los skills se adaptan al proyecto destino leyendo:
 
 **"Conflicto de puerto"**: `kill $(lsof -t -i :9223)` y reiniciar Claude Code.
 
+**"use_figma no disponible"**: Verificar que Figma Remote MCP esta configurado (`claude mcp add --transport http figma-remote https://mcp.figma.com/mcp`). El tool `use_figma` requiere que el MCP server de Figma este en la sesion. Verificar con `whoami`.
+
+**"Extended Collections falla / no aparece"**: Extended Variable Collections requiere plan Enterprise. En planes Professional, usar modes dentro de una coleccion (max 4 modes). `extendLibraryCollectionByKeyAsync` lanza error si no es Enterprise.
+
 ## Adopcion en Proyectos Nuevos
 
 Ver `docs/how-to-adopt.md` para la guia completa. Quick start:
 1. Copiar `.claude/skills/` a tu proyecto
 2. Configurar `figma-console-mcp` con tu Figma PAT
-3. Abrir el plugin Desktop Bridge en tu archivo de Figma
+3. Abrir el plugin Desktop Bridge en tu archivo de Figma (o usar `use_figma` como alternativa sin Desktop)
 4. Ejecutar `/design-normalizer` para auditar el estado actual

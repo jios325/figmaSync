@@ -31,8 +31,10 @@ Si componentizas antes de tokenizar, tendras que re-hacer todo.
 
 ## Prerequisitos
 
-1. Figma Desktop con plugin Desktop Bridge corriendo (punto verde)
-2. Verificar conexion: `figma_get_status`
+1. Canal de escritura disponible (ver `/figma-sync` Paso 0):
+   - **Opcion A (primaria):** Figma Desktop con plugin Desktop Bridge corriendo (punto verde)
+   - **Opcion B (alternativa):** `use_figma` via Figma Remote MCP (sin Desktop Bridge)
+2. Verificar conexion: `figma_get_status` (Opcion A) o `whoami` (Opcion B)
 3. URL del archivo Figma a normalizar
 
 ## Pipeline: 6 Fases en Orden Estricto
@@ -166,6 +168,41 @@ Semantic: mapeo por USO/CONTEXTO:
   color/neutral/placeholder → #BFBFBF (gris para Upload/Image placeholders)
   color/feedback/*     → error, success, warning
 ```
+
+#### Paso 2.3b: Extended Collections para Theming (solo Enterprise)
+
+Si el proyecto requiere multi-brand o theming, Y tiene plan Enterprise:
+
+1. **Crear coleccion base** (Primitives + Semantic) como en Paso 2.3
+2. **Publicar como Library** (requisito para extender)
+3. **Extender por tema:**
+   ```javascript
+   // use_figma o figma_execute:
+   // Para cada tema/brand:
+   const extension = await figma.variables.extendLibraryCollectionByKeyAsync(
+     baseCollectionKey,  // key de la coleccion publicada
+     "Brand A"           // nombre del tema
+   );
+   // Hacer overrides de variables especificas:
+   const variable = await figma.variables.getVariableByIdAsync(varId);
+   const values = await variable.valuesByModeForCollectionAsync(extension);
+   // Modificar valores por mode
+   ```
+
+4. **Leer valores por tema:**
+   ```javascript
+   const values = await variable.valuesByModeForCollectionAsync(extension);
+   // Retorna los valores resueltos incluyendo overrides del tema
+   ```
+
+**Limitaciones:**
+- Requiere plan Enterprise. `extendLibraryCollectionByKeyAsync` lanza error en otros planes.
+- La coleccion base DEBE estar publicada como Library.
+- Propiedad `rootVariableCollectionId` identifica el ancestro raiz.
+
+**Fallback sin Enterprise:**
+- Usar modes dentro de una coleccion (max 4 en Professional): ej. "Brand A", "Brand B", "Brand C", "Brand D"
+- O crear colecciones separadas por tema (sin herencia, requiere sync manual)
 
 #### Paso 2.4: Aplicar variables por CONTEXTO (3 fases)
 
@@ -340,7 +377,10 @@ Semantic: mapeo por USO/CONTEXTO:
    // Report: bound / (bound + unbound) * 100 = % tokenizado
    ```
 
-4. **Generar reporte final:**
+4. **Check Designs linter (complemento manual):**
+   Sugerir al usuario ejecutar "Check Designs" en Figma (quick action) para detectar valores raw que deberian ser variables. El linter nativo usa un modelo AI que sugiere la variable correcta por contexto. Esto complementa `figma_lint_design` que corre via API.
+
+5. **Generar reporte final:**
    ```markdown
    # Normalization Report
 

@@ -59,6 +59,7 @@ Validacion automatizada de calidad para pantallas de Figma.
 | Spacing consistente | 5 | Gaps y paddings son multiplos de 4 o 8 |
 | No hay colores hardcodeados | 5 | Ningun color fuera de la paleta |
 | Opacidades correctas | 5 | Text primary 0.85, secondary 0.45, disabled 0.25 |
+| Check Designs clean (bonus) | +5 | 0 issues en Check Designs linter nativo (bonus, no resta) |
 
 ### 4. Consistencia (25 pts)
 
@@ -145,6 +146,22 @@ Verificar:
 - Contraste WCAG (AA minimo)
 - Touch targets (44px minimo)
 - Text sizing (12px minimo)
+
+### Paso 3b: Check Designs Linter (complemento manual)
+
+El **Check Designs** es el linter nativo de Figma que detecta valores raw que deberian ser variables. Usa un modelo AI que sugiere la variable correcta por contexto.
+
+**Que detecta:**
+- Colores hardcodeados que deberian ser variables
+- Spacing sin variable asociada
+- Tipografia sin text style
+
+**Integracion con scoring:**
+- Si el usuario ejecuta Check Designs y reporta 0 issues → **+5 bonus** en categoria "Tokens y estilos" (max 25 sin bonus, 30 con bonus)
+- Cada issue de Check Designs en la pantalla evaluada → **-1 punto** en "Tokens y estilos"
+
+**Limitacion:** Check Designs corre en el cliente de Figma, no via API. Si el score de tokens es < 20/25, recomendar al usuario:
+> "Ejecuta 'Check Designs' via quick action en Figma para identificar valores raw que deberian usar variables."
 
 ### Paso 4: Comparar con pantalla hermana
 

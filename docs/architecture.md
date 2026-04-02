@@ -189,6 +189,51 @@ El Plugin API de Figma tiene acceso TOTAL al documento:
   - figma.variables.*, figma.teamLibrary.*
 ```
 
+## Canal de Escritura Alternativo: use_figma (MCP Oficial)
+
+Desde 2026, Figma abrio el canvas a agentes AI via `use_figma`, un tool del MCP Server oficial que ejecuta JavaScript del Plugin API via HTTP — sin requerir Desktop Bridge.
+
+**Arquitectura actualizada (3 canales):**
+```
+Figma Desktop <--WebSocket:9223--> figma-console-mcp <--> Claude Code  (ESCRITURA PRIMARIA)
+Figma Cloud  <--HTTP REST--------> use_figma         <--> Claude Code  (ESCRITURA ALTERNATIVA)
+PAT Token    --> REST API --------> Figma Cloud       <--> Claude Code  (LECTURA)
+```
+
+**Seleccion automatica:** El orquestador (`figma-sync`) detecta el canal disponible antes de cada sesion:
+1. `figma_get_status` OK → figma-console-mcp (primario)
+2. Else `use_figma` disponible → use_figma (fallback)
+3. Else → modo read-only
+
+**Parametros de use_figma:** `use_figma(fileKey, code, description)` — ejecuta JS del Plugin API. Equivale a `figma_execute` pero sin Desktop Bridge.
+
+Ver `docs/decisions/05-official-mcp-write-channel.md` para la comparacion completa.
+
+## Capacidades Nuevas (2025-2026)
+
+### Extended Variable Collections (Theming)
+- Colecciones de variables se pueden "extender" para crear temas multi-brand
+- `figma.variables.extendLibraryCollectionByKeyAsync(collectionKey, name)`
+- `variable.valuesByModeForCollectionAsync(collection)` para leer valores por tema
+- **Solo Enterprise.** Fallback: usar modes en una coleccion (max 4 en Professional)
+
+### Library Analytics API
+- API REST con 6 endpoints: components/styles/variables x actions/usages
+- Datos de uso: instancias, detachments, inserciones por componente
+- Scope requerido: `library_analytics:read`. **Solo Enterprise.**
+- Usado por `/drift-detection` y `/design-system-health`
+
+### Code Connect UI Nativa
+- UI integrada en Figma con conexion directa a GitHub
+- AI sugiere mapeos. Genera snippets automaticos
+- Nuevo campo: **MCP usage instructions** para LLMs
+- **Organization y Enterprise.** Nuestro `/code-connect-bridge` complementa para bulk/automatizacion
+
+### Check Designs Linter
+- Linter nativo que detecta valores raw que deberian ser variables
+- Modelo AI sugiere la variable correcta por contexto
+- Complementa `figma_lint_design` (API). Referenciado en `/figma-quality-gate`
+
 ## Limitaciones conocidas
 
 1. **figma-console-mcp** requiere Figma Desktop (no web app) con el plugin corriendo
@@ -199,6 +244,10 @@ El Plugin API de Figma tiene acceso TOTAL al documento:
 6. `generate_figma_design` necesita que el servidor local este corriendo
 7. El plugin Desktop Bridge debe estar abierto en el archivo Figma que se quiere editar
 8. Solo UN archivo Figma activo por conexion WebSocket (cambiar con `figma_navigate`)
+9. **use_figma** esta en beta — sera de pago. No tiene lint ni screenshots real-time
+10. **Extended Variable Collections** solo disponible en plan Enterprise
+11. **Library Analytics API** solo disponible en plan Enterprise
+12. **Code Connect UI nativa** requiere plan Organization o Enterprise
 # Flujo de Datos — FigmaSync
 
 ## Diagrama General

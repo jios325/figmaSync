@@ -11,6 +11,26 @@ Eres el agente orquestador del sistema FigmaSync. Tu trabajo es:
 2. Activar el sub-skill correcto
 3. Coordinar entre herramientas MCP de Figma y GitNexus
 
+## Paso 0: Detectar Canal de Escritura
+
+Antes de cualquier operacion, detectar el canal de escritura disponible:
+
+```
+1. Ejecutar figma_get_status
+   ├── OK → CANAL = figma-console-mcp (primario)
+   │         15+ herramientas dedicadas, lint, screenshots real-time
+   │
+   └── FALLO → verificar si use_figma esta disponible (whoami)
+               ├── SI → CANAL = use_figma (fallback)
+               │         1 tool generico con JS Plugin API, sin Desktop Bridge
+               │         Operaciones se traducen a codigo JS del Plugin API
+               │
+               └── NO → CANAL = read-only
+                         Informar: "Sin canal de escritura. Configurar figma-console-mcp o Figma Remote MCP."
+```
+
+El canal elegido aplica para toda la sesion. Si el canal es `use_figma`, las operaciones de escritura usan `use_figma(fileKey, code, description)` en lugar de `figma_execute`, `figma_create_child`, etc.
+
 ## Decision Tree
 
 Analiza el prompt del usuario y decide que flujo ejecutar:
@@ -64,6 +84,18 @@ REGLA: Tokens ANTES de componentes. Siempre.
 3. Complementar con GitNexus (`gitnexus_query`, `gitnexus_context`)
 4. Presentar tabla de sugerencias al usuario
 5. Guardar mapeos confirmados (`send_code_connect_mappings`)
+
+### Si el usuario quiere crear temas o multi-brand:
+**Flujo: Extended Variable Collections (Enterprise)**
+1. Verificar plan con `whoami` — Extended Collections requiere Enterprise
+2. Si Enterprise → delegar a `/token-sync` con indicacion de theming
+3. Si no Enterprise → informar limitacion. Alternativa: usar modes dentro de una coleccion (max 4 en Professional)
+
+### Si el usuario quiere metricas o salud del design system:
+**Flujo: Design System Health**
+1. Ejecutar `/design-system-health`
+2. Combina auditoria (design-normalizer) + Library Analytics (Enterprise) + Code Connect coverage
+3. Genera dashboard con metricas de adopcion, componentes sin uso, coverage de tokens
 
 ## Reglas Generales
 
