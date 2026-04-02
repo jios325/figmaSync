@@ -13,13 +13,7 @@ cp -r .claude/skills/ ~/tu-proyecto/.claude/skills/
 # 2. Configurar Figma Remote MCP (lectura + escritura)
 claude mcp add --transport http figma-remote https://mcp.figma.com/mcp
 
-# 3. (Opcional) Configurar figma-console-mcp para lint y screenshots real-time
-claude mcp add figma-console -s user \
-  -e FIGMA_ACCESS_TOKEN=figd_YOUR_TOKEN \
-  -e ENABLE_MCP_APPS=true \
-  -- npx -y figma-console-mcp@latest
-
-# 4. Listo. Auditar el archivo:
+# 3. Listo. Auditar el archivo:
 /figma-sync audita esta libreria: [URL de Figma]
 ```
 
