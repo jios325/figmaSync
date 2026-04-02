@@ -37,17 +37,59 @@ Analiza el prompt del usuario y decide que flujo ejecutar:
 ### Si el usuario quiere auditar/normalizar un archivo de Figma:
 **Flujo: Normalizacion**
 - Si solo quiere un reporte/auditoria → ejecutar `/design-normalizer`
-- Si quiere normalizar completamente (cleanup + tokens + componentes) → ejecutar `/normalization-pipeline`
+- Si quiere normalizar completamente → detectar tipo de archivo primero:
 
-El pipeline de normalizacion sigue 6 fases en orden estricto:
-1. Auditoria (read-only)
-2. Limpieza estructural
-3. Tokenizacion (SIEMPRE antes de componentizar)
-4. Auto Layout
-5. Componentizacion
-6. Validacion
+#### Paso N.1: Detectar tipo de archivo (LIBRERIA vs PROYECTO)
 
-REGLA: Tokens ANTES de componentes. Siempre.
+Ejecutar `get_metadata` en la pagina principal y contar:
+- `symbol` / `COMPONENT` / `COMPONENT_SET` = componentes
+- `frame` con width >= 1440 y children con header/sidebar = pantallas
+
+```
+Regla de decision:
+  componentes > pantallas × 2  → TIPO = LIBRERIA
+  pantallas >= componentes      → TIPO = PROYECTO
+  Dudoso                        → preguntar al usuario
+```
+
+#### Paso N.2a: Si LIBRERIA → Pipeline de Libreria
+
+Orden optimizado para archivos de componentes (design system):
+```
+1. /design-normalizer           → Score inicial, inventario de componentes
+2. Consolidar duplicados        → Merge componentes similares en component sets
+                                   (ej: "bar-header" + "bar-header-white" = 1 component set)
+3. Renombrar variantes          → "Property 1=Default" → "State=Default, Theme=Light"
+4. /token-sync                  → Crear Primitives + Semantic con hex reales
+5. Auto Layout bottom-up        → En CADA componente (atoms → molecules → organisms)
+6. Reorganizar por Atomic Design:
+   - Atoms: buttons, inputs, icons, tags, badges, arrows
+   - Molecules: cards, form fields, search bars, nav items
+   - Organisms: headers, footers, menus, faqs, modulos completos
+7. /component-library-sync      → Organizar en pagina Design System por categoria
+8. /figma-quality-gate          → Validacion (ajustar: no buscar sidebar/header de pantalla)
+9. Publicar como Library
+```
+
+**REGLA:** Tokens ANTES de componentes. Siempre.
+**REGLA:** Consolidar duplicados ANTES de tokenizar (menos nodos = menos trabajo).
+**REGLA:** En librerias, buscar con `search_design_system` si el componente ya existe en otra libreria conectada antes de recrear.
+
+#### Paso N.2b: Si PROYECTO → Pipeline de Proyecto
+
+Orden estandar para archivos con pantallas:
+```
+1. /design-normalizer           → Score inicial
+2. Limpieza estructural         → Renombrar layers, aplanar nesting, organizar paginas
+3. /token-sync                  → Extraer colores reales, crear y aplicar variables
+4. Auto Layout                  → Convertir layouts fijos a flexbox (bottom-up)
+5. /component-library-sync      → Extraer y organizar componentes locales
+6. search_design_system          → Reemplazar locals por instancias de libreria donde existan
+7. /figma-quality-gate          → Validacion final (score objetivo: >80)
+```
+
+**REGLA:** Tokens ANTES de componentes. Siempre.
+**REGLA:** En proyectos, preferir instancias de libreria sobre componentes locales.
 
 ### Si el usuario quiere detectar diferencias entre Figma y produccion:
 **Flujo: Drift Detection**
