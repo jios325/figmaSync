@@ -39,7 +39,8 @@ Analiza el prompt del usuario y decide que flujo ejecutar:
 **Flujo: Figma → Code**
 1. Extraer fileKey y nodeId de la URL de Figma
 2. Ejecutar `get_design_context(nodeId, fileKey, { clientLanguages: "typescript,html,css", clientFrameworks: "react,nextjs" })`
-3. Ejecutar `get_code_connect_map(nodeId, fileKey)` para ver mapeos existentes
+3. Ejecutar `search_design_system({ query: "component name", fileKey })` para encontrar componentes disponibles en librerias publicadas
+4. Ejecutar `get_code_connect_map(nodeId, fileKey)` para ver mapeos existentes
 4. Buscar componentes existentes con `gitnexus_query` o `gitnexus_context`
 5. Generar codigo reutilizando componentes del proyecto
 6. Validar impacto con `gitnexus_impact` antes de modificar

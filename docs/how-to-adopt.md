@@ -149,6 +149,9 @@ This will:
 | `drift-detection` | Compare Figma vs production | Read-only | Read-only |
 | `code-connect-bridge` | Map Figma components to code | Read-only | Read-only |
 | `design-system-health` | DS health dashboard + analytics | Read-only | Read-only |
+| `figma-use` | Plugin API prerequisite (rules, gotchas) | Yes | Yes (mandatory) |
+| `figma-create-new-file` | Create new Figma files | No | Yes |
+| `design-system-rules-generator` | Generate DS rules for project | Read-only | Read-only |
 
 ## Enterprise Features (optional)
 

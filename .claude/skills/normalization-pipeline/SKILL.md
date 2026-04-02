@@ -18,6 +18,7 @@ tools:
   - figma_capture_screenshot
   - figma_rename_node
   - figma_search_components
+  - search_design_system
 ---
 
 # Normalization Pipeline — Normalizar Cualquier Archivo Figma
@@ -316,7 +317,13 @@ Si el proyecto requiere multi-brand o theming, Y tiene plan Enterprise:
    - La instancia mas frecuente o mas pulida
    - La que ya tiene tokens aplicados
 
-3. **Promover a componente (bottom-up):**
+3. **Buscar en librerias publicadas ANTES de crear:**
+   ```
+   search_design_system({ query: "Button", fileKey: "{fileKey}" })
+   ```
+   Si el componente existe en una libreria publicada, usar instancia importada en vez de crear componente local. Solo crear local si NO existe equivalente en librerias.
+
+4. **Promover a componente (bottom-up):**
    - Atomos primero: botones, inputs, badges
    - Moleculas despues: cards, form groups
    - Organismos al final: headers, sidebars

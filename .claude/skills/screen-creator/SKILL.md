@@ -22,6 +22,8 @@ tools:
   - figma_capture_screenshot
   - figma_get_selection
   - figma_search_components
+  - search_design_system
+  - use_figma
 ---
 
 # Screen Creator
@@ -36,8 +38,10 @@ Crea pantallas nuevas en Figma que siguen exactamente los patrones visuales y es
 
 Antes de crear cualquier pantalla:
 
-1. **Identificar la página destino** en Figma
-2. **Encontrar una pantalla hermana** — la más parecida a lo que se va a crear
+0. **Cargar `/figma-use`** si el canal de escritura es `use_figma` — contiene reglas pre-flight obligatorias
+1. **Buscar componentes en librerias publicadas** con `search_design_system` antes de crear cualquier componente nuevo — si existe en libreria, importar con `importComponentByKeyAsync` en vez de recrear
+2. **Identificar la página destino** en Figma
+3. **Encontrar una pantalla hermana** — la más parecida a lo que se va a crear
 3. **Leer la estructura de la pantalla hermana** para replicar el layout exacto
 
 ## Discovery Phase — Layout Shell

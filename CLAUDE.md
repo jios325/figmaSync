@@ -32,6 +32,8 @@ PAT Token    --> REST API --------> Figma Cloud       <--> Claude Code  (LECTURA
 - `figma_execute` ejecuta JS arbitrario en contexto del plugin — herramienta mas poderosa, usada para operaciones en lote, crear paginas, mover nodes entre paginas
 - Solo 2 operaciones requieren intervencion manual: copiar entre archivos Figma e importar librerias externas
 - Solo UN archivo Figma activo por conexion WebSocket (cambiar con `figma_navigate`)
+- **Antes de CUALQUIER `use_figma` o `figma_execute`, cargar `/figma-use`** — contiene 17 reglas pre-flight que previenen errores del Plugin API
+- **Antes de crear componentes, buscar con `search_design_system`** — si existe en libreria publicada, importar en vez de recrear
 
 ## Seleccion de Canal de Escritura
 
@@ -58,7 +60,12 @@ Conversion de Node ID: la URL usa "-", los tools usan ":"
   1635-27981 (URL) → 1635:27981 (parametro)
 ```
 
-## Skills (12, todos project-agnostic)
+## Skills (15, todos project-agnostic)
+
+### Prerequisitos
+| Skill | Cuando usar |
+|-------|-------------|
+| `/figma-use` | **OBLIGATORIO** antes de cualquier `use_figma` o `figma_execute`. Reglas pre-flight, gotchas, patrones del Plugin API |
 
 ### Normalizacion
 | Skill | Cuando usar |
@@ -72,6 +79,7 @@ Conversion de Node ID: la URL usa "-", los tools usan ":"
 | `/screen-creator` | Crear pantallas nuevas (siempre clona una hermana existente, nunca desde cero) |
 | `/component-library-sync` | Registrar componentes nuevos en la pagina Design System |
 | `/variant-generator` | Generar variantes desde props/enums del codigo |
+| `/figma-create-new-file` | Crear un nuevo archivo Figma (Design o FigJam) en drafts |
 
 ### Sincronizacion
 | Skill | Cuando usar |
@@ -79,6 +87,7 @@ Conversion de Node ID: la URL usa "-", los tools usan ":"
 | `/figma-sync` | Orquestador — rutea al sub-skill correcto segun el intent |
 | `/token-sync` | Sincronizar design tokens (Figma ↔ codigo, o design-only) |
 | `/code-connect-bridge` | Mapear componentes de Figma a componentes de codigo |
+| `/design-system-rules-generator` | Generar reglas de design system para CLAUDE.md/AGENTS.md/.cursor/rules |
 
 ### Calidad
 | Skill | Cuando usar |
@@ -146,6 +155,8 @@ Todos los skills se adaptan al proyecto destino leyendo:
 **Variables/tokens:** `figma_setup_design_tokens` (crear coleccion + modes + variables en UNA llamada), `figma_batch_create_variables` (hasta 100), `figma_batch_update_variables`
 
 **Lectura:** `figma_get_status`, `figma_get_selection`, `figma_get_file_data`, `figma_lint_design`, `figma_capture_screenshot`
+
+**Busqueda en librerias:** `search_design_system` (buscar componentes, variables, estilos en TODAS las librerias publicadas conectadas al archivo)
 
 ## Referencia de Herramientas Figma Remote (use_figma)
 
