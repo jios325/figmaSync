@@ -24,12 +24,12 @@ PAT Token --> REST API --> Figma Cloud                                  (LECTURA
 
 ## Reglas Criticas
 
-- **figma-console-mcp** requiere Figma Desktop (NO web app) con el plugin Desktop Bridge corriendo
-- Antes de CUALQUIER operacion de escritura, verificar conexion con `figma_get_status`
-- Las operaciones de escritura van por Plugin API (WebSocket), NO por REST API
-- `figma_execute` ejecuta JS arbitrario en contexto del plugin — herramienta mas poderosa, usada para operaciones en lote, crear paginas, mover nodes entre paginas
+- **Canal primario de escritura: `use_figma`** (Figma Remote MCP via HTTP). No requiere Desktop Bridge ni Figma Desktop
+- **NUNCA bloquear pidiendo Desktop Bridge.** Si `figma-console-mcp` no esta disponible, continuar con `use_figma`
+- **figma-console-mcp es OPCIONAL** — solo necesario para `figma_lint_design` y `figma_capture_screenshot` (real-time). Si no esta configurado, ignorar
+- Antes de CUALQUIER `use_figma`, cargar `/figma-use` con las 17 reglas pre-flight del Plugin API
+- Antes de crear componentes, buscar con `search_design_system` en librerias publicadas
 - Solo 2 operaciones requieren intervencion manual: copiar entre archivos Figma e importar librerias externas
-- Solo UN archivo Figma activo por conexion WebSocket (cambiar con `figma_navigate`)
 
 ## Parseo de URLs de Figma
 

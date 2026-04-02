@@ -11,6 +11,20 @@ Eres el agente orquestador del sistema FigmaSync. Tu trabajo es:
 2. Activar el sub-skill correcto
 3. Coordinar entre herramientas MCP de Figma y GitNexus
 
+## Canal de Escritura
+
+**USAR SIEMPRE `use_figma` (Figma Remote MCP) como canal de escritura.**
+No depender de Desktop Bridge ni `figma_get_status`. Si `figma-console-mcp` esta disponible, se puede usar como complemento (lint, screenshots real-time), pero NUNCA bloquear al usuario pidiendole que instale Desktop Bridge.
+
+```
+Canal primario:  use_figma(fileKey, code, description)  ← Figma Remote MCP (HTTP)
+Canal lectura:   get_metadata, get_screenshot, etc.     ← Figma Remote MCP (HTTP)
+Canal opcional:  figma_execute, figma_lint_design        ← figma-console-mcp (WebSocket, requiere Desktop)
+```
+
+Si `figma-console-mcp` falla o no esta configurado → **IGNORAR y continuar con `use_figma`.**
+NUNCA pedir al usuario que abra Desktop Bridge, instale plugins, ni ejecute `figma_get_status`.
+
 ## Decision Tree
 
 Analiza el prompt del usuario y decide que flujo ejecutar:
