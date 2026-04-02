@@ -7,9 +7,7 @@ Funciona con **cualquier** proyecto, framework o libreria UI.
 ## Prerequisitos
 
 - [Claude Code](https://claude.ai/code) instalado
-- Figma Personal Access Token (PAT)
-- **Opcion A:** Figma Desktop + plugin Desktop Bridge (escritura primaria)
-- **Opcion B:** Figma Remote MCP con `use_figma` (sin Desktop Bridge, beta)
+- Cuenta de Figma (cualquier plan)
 
 ## Quick Start
 
@@ -17,28 +15,14 @@ Funciona con **cualquier** proyecto, framework o libreria UI.
 # 1. Copiar skills a tu proyecto
 cp -r .claude/skills/ ~/tu-proyecto/.claude/skills/
 
-# 2. Configurar figma-console-mcp (escritura primaria — requiere Figma Desktop)
-claude mcp add figma-console -s user \
-  -e FIGMA_ACCESS_TOKEN=figd_YOUR_TOKEN \
-  -e ENABLE_MCP_APPS=true \
-  -- npx -y figma-console-mcp@latest
-
-# 3. Configurar Figma Remote (lectura + escritura alternativa via use_figma)
+# 2. Configurar Figma Remote MCP (lectura + escritura)
 claude mcp add --transport http figma-remote https://mcp.figma.com/mcp
 
-# 4. Abrir Desktop Bridge en tu archivo Figma → verificar punto verde
-#    (o saltear si usas solo use_figma como canal de escritura)
-
-# 5. Auditar el archivo
-/design-normalizer
+# 3. Listo. Auditar el archivo:
+/figma-sync audita esta libreria: [URL de Figma]
 ```
 
-### Deteccion automatica de canal
-
-El orquestador (`/figma-sync`) detecta automaticamente que canal de escritura usar:
-1. `figma_get_status` OK → **figma-console-mcp** (primario: 15+ tools, lint, screenshots real-time)
-2. Else `use_figma` disponible → **use_figma** (fallback: sin Desktop Bridge)
-3. Else → **modo read-only**
+Todas las operaciones usan `use_figma` (Figma Remote MCP via HTTP). No requiere Figma Desktop ni plugins.
 
 ## Pipeline de Normalizacion (orden estricto)
 
@@ -88,6 +72,84 @@ Verifica naming, Auto Layout, tokens, consistencia. Integra Check Designs linter
 > **REGLA:** Copiar componentes locales como referencia ANTES de tokenizar para comparar despues.
 > **REGLA:** Antes de CUALQUIER `use_figma`, cargar `/figma-use` con las 17 reglas pre-flight.
 
+---
+
+## Casos de Uso (Prompts de Ejemplo)
+
+### Normalizar una libreria con Atomic Design
+```
+/figma-sync normaliza esta libreria usando Atomic Design:
+https://www.figma.com/design/XXXXX/mi-libreria?node-id=212-6455
+```
+
+### Normalizar un proyecto con pantallas
+```
+/figma-sync normaliza este proyecto:
+https://www.figma.com/design/XXXXX/mi-proyecto?node-id=0-1
+```
+
+### Auditar sin modificar (solo reporte)
+```
+/design-normalizer https://www.figma.com/design/XXXXX/mi-archivo?node-id=0-1
+```
+
+### Implementar un diseno de Figma en codigo
+```
+/figma-sync implementa este frame:
+https://www.figma.com/design/XXXXX/mi-proyecto?node-id=1635-27981
+```
+
+### Crear una pantalla nueva en Figma
+```
+/screen-creator crea la pantalla de Users en:
+https://www.figma.com/design/XXXXX/mi-proyecto?node-id=0-1
+```
+
+### Sincronizar tokens entre Figma y codigo
+```
+/token-sync sincroniza los tokens de Figma con el codigo:
+https://www.figma.com/design/XXXXX/mi-proyecto?node-id=0-1
+```
+
+### Detectar drift (Figma vs produccion)
+```
+/drift-detection compara Figma con produccion:
+Figma: https://www.figma.com/design/XXXXX/mi-proyecto?node-id=0-1
+Produccion: https://mi-app.com
+```
+
+### Mapear componentes (Code Connect)
+```
+/code-connect-bridge mapea los componentes:
+https://www.figma.com/design/XXXXX/mi-libreria?node-id=0-1
+```
+
+### Generar guidelines para Figma Make Kit
+```
+/design-system-rules-generator genera guidelines para Make Kit:
+https://www.figma.com/design/XXXXX/mi-libreria?node-id=0-1
+```
+Genera la carpeta `guidelines/` con `components/*.md`, `foundations/*.md`, `composition/*.md` — el formato que Figma Make usa para construir prototipos con tu design system real.
+
+### Generar reglas para agentes AI
+```
+/design-system-rules-generator genera reglas para el proyecto:
+https://www.figma.com/design/XXXXX/mi-libreria?node-id=0-1
+```
+Genera reglas en CLAUDE.md (Claude Code), AGENTS.md (Codex), o .cursor/rules (Cursor).
+
+### Crear un archivo Figma nuevo
+```
+/figma-create-new-file design "Mi Proyecto v2"
+```
+
+### Ver la salud del design system
+```
+/design-system-health https://www.figma.com/design/XXXXX/mi-libreria?node-id=0-1
+```
+
+---
+
 ## Errores Comunes en Tokenizacion
 
 | Error | Causa | Prevencion |
@@ -126,7 +188,7 @@ Verifica naming, Auto Layout, tokens, consistencia. Integra Check Designs linter
 | `/figma-sync` | Both | Orquestador bidireccional Figma ↔ Codigo |
 | `/token-sync` | Write | Crear y aplicar design tokens. Soporta Extended Collections (Enterprise) |
 | `/code-connect-bridge` | Write | Mapear componentes Figma → codigo. Templates parserless avanzados |
-| `/design-system-rules-generator` | Write | Generar reglas de DS para CLAUDE.md/AGENTS.md/.cursor/rules |
+| `/design-system-rules-generator` | Write | Generar reglas para agentes AI + guidelines para Figma Make Kits |
 
 ### Calidad
 | Skill | Tipo | Descripcion |
