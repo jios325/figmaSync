@@ -38,7 +38,7 @@ Analizar el XML retornado buscando:
 
 ### Paso 2.5: Inventario de Colores, Tipografia y Spacing
 
-Ejecutar via `figma_execute` un scan recursivo de todos los nodos:
+Ejecutar via `use_figma` un scan recursivo de todos los nodos:
 
 **Colores:** Extraer todos los hex unicos de fills y strokes con conteo de usos.
 ```javascript

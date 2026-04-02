@@ -9,15 +9,12 @@ triggers:
   - "cleanup figma"
   - "arregla este archivo"
 tools:
-  - figma_execute
-  - figma_get_status
-  - figma_get_file_data
-  - figma_lint_design
-  - figma_setup_design_tokens
-  - figma_batch_create_variables
-  - figma_capture_screenshot
-  - figma_rename_node
-  - figma_search_components
+  - use_figma
+  - get_metadata
+  - get_screenshot
+  - get_variable_defs
+  - get_design_context
+  - search_design_system
 ---
 
 # Normalization Pipeline — Normalizar Cualquier Archivo Figma
@@ -31,8 +28,8 @@ Si componentizas antes de tokenizar, tendras que re-hacer todo.
 
 ## Prerequisitos
 
-1. Figma Desktop con plugin Desktop Bridge corriendo (punto verde)
-2. Verificar conexion: `figma_get_status`
+1. Figma Remote MCP configurado (`claude mcp add --transport http figma-remote https://mcp.figma.com/mcp`)
+2. Verificar conexion: `whoami()`
 3. URL del archivo Figma a normalizar
 
 ## Pipeline: 6 Fases en Orden Estricto
@@ -48,7 +45,7 @@ Si componentizas antes de tokenizar, tendras que re-hacer todo.
    ```
 3. Extraer inventario de colores REALES del archivo:
    ```javascript
-   // figma_execute: traverse all nodes, extract unique hex values with counts
+   // via use_figma: traverse all nodes, extract unique hex values with counts
    const colorMap = {};
    function scan(node) {
      if ('fills' in node && Array.isArray(node.fills)) {
@@ -86,7 +83,7 @@ Si componentizas antes de tokenizar, tendras que re-hacer todo.
 
 1. **Renombrar layers genericos:**
    ```javascript
-   // figma_execute: find all nodes named "Frame N", "Group N", "Rectangle N"
+   // via use_figma: find all nodes named "Frame N", "Group N", "Rectangle N"
    // Rename based on content/context:
    // - Frame con children de texto → usar el texto como nombre
    // - Frame con fills de color → "bg-{color}" o "container"
@@ -126,7 +123,7 @@ Si componentizas antes de tokenizar, tendras que re-hacer todo.
 #### Paso 2.1: Copiar referencia visual ANTES de tocar nada
 
 ```javascript
-// figma_execute: duplicar la seccion de componentes locales como backup
+// via use_figma: duplicar la seccion de componentes locales como backup
 // Nombrar la copia "Componentes Locales — REFERENCIA (no tocar)"
 ```
 Ademas, tomar screenshots de 5+ pantallas representativas como referencia.
@@ -134,7 +131,7 @@ Ademas, tomar screenshots de 5+ pantallas representativas como referencia.
 #### Paso 2.2: Escanear colores reales (ALL fill types)
 
 ```javascript
-// figma_execute: traverse ALL nodes, extract:
+// via use_figma: traverse ALL nodes, extract:
 // - fills SOLID → hex + count
 // - fills IMAGE → count + node names (placeholders)
 // - fills GRADIENT → count
@@ -171,7 +168,7 @@ Semantic: mapeo por USO/CONTEXTO:
 
 **Fase A — Por estructura/nombre (mas seguro, sin ambiguedad):**
 ```javascript
-// figma_execute: aplicar segun nombre o estructura del nodo
+// via use_figma: aplicar segun nombre o estructura del nodo
 // - Nodo con nombre "sidebar" o "side bar" → color/bg/sidebar
 // - Frame principal (width >= 1440) → color/bg/page
 // - Nodo con nombre "bg" o "background" → color/bg/primary o color/bg/elevated
@@ -270,7 +267,7 @@ Semantic: mapeo por USO/CONTEXTO:
 
 1. **Identificar patrones repetidos:**
    ```javascript
-   // figma_execute: find frames with similar structure
+   // via use_figma: find frames with similar structure
    // Criteria: same children count, similar dimensions, same fills
    // Group by visual similarity
    ```
@@ -286,7 +283,7 @@ Semantic: mapeo por USO/CONTEXTO:
 
 4. **Crear pagina Design System:**
    ```javascript
-   // figma_execute
+   // via use_figma
    let dsPage = figma.root.children.find(p => p.name === 'Design System');
    if (!dsPage) {
      dsPage = figma.createPage();
@@ -315,8 +312,9 @@ Semantic: mapeo por USO/CONTEXTO:
 
 1. **Ejecutar lint:**
    ```
-   figma_lint_design({ rules: ["all"] })
+   figma_lint_design({ rules: ["all"] })  (solo con figma-console-mcp, opcional)
    ```
+   Alternativa: verificar manualmente con `get_screenshot` y `get_metadata`.
 
 2. **Ejecutar quality gate en pantallas clave:**
    - Login/home
@@ -326,7 +324,7 @@ Semantic: mapeo por USO/CONTEXTO:
 
 3. **Medir cobertura de tokenizacion:**
    ```javascript
-   // figma_execute: count fills with vs without variable bindings
+   // via use_figma: count fills with vs without variable bindings
    let bound = 0, unbound = 0;
    function count(node) {
      if ('fills' in node && Array.isArray(node.fills)) {
@@ -379,7 +377,7 @@ Semantic: mapeo por USO/CONTEXTO:
 3. **Solo Light mode por defecto** — Dark mode solo si el diseno original lo tiene
 4. **Colores de marca = tokens** — dorado, navy, teal corporativo, todos van como `color/brand/*`
 5. **Checkpoint visual despues de cada fase** — si algo se ve mal, undo antes de continuar
-6. **Batch por pagina** — procesar una pagina a la vez para evitar timeout de `figma_execute` (30s max)
+6. **Batch por pagina** — procesar una pagina a la vez para evitar timeout de `use_figma` (30s max)
 7. **Mismo hex ≠ mismo significado** — un color puede ser correcto en un componente e incorrecto en otro. Despues del batch-apply, revisar componente por componente
 8. **NUNCA borrar colecciones sin limpiar bindings** — las referencias huerfanas hacen que Figma renderice nodos como negro. Preferir undo sobre borrar+recrear
 9. **Escanear ALL fill types** — no solo SOLID. Los fills IMAGE aparecen como cuadros negros si no se tratan

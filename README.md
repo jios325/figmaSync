@@ -236,10 +236,9 @@ https://www.figma.com/design/XXXXX/mi-libreria?node-id=0-1
 | Problema | Solucion |
 |----------|----------|
 | `use_figma` no disponible | `claude mcp add --transport http figma-remote https://mcp.figma.com/mcp` |
-| Escrituras fallan, lecturas ok | Si usas Desktop Bridge, verificar plugin corriendo. Si no, verificar `use_figma` |
+| Escrituras fallan, lecturas ok | Verificar acceso a `use_figma` y que `/figma-use` se cargue antes de scripts complejos |
 | Extended Collections falla | Requiere plan Enterprise. Fallback: usar modes (max 4 en Professional) |
 | Colores cambiaron al tokenizar | Hex no coincide. Undo y re-escanear colores reales |
-| Conflicto de puerto 9223 | `kill $(lsof -t -i :9223)` y reiniciar (solo si usas Desktop Bridge) |
 
 ## Proyectos Compatibles
 

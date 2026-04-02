@@ -10,18 +10,11 @@ triggers:
   - "new figma screen"
   - "falta la pantalla de"
 tools:
-  - figma_execute
-  - figma_create_child
-  - figma_instantiate_component
-  - figma_clone_node
-  - figma_set_text
-  - figma_set_fills
-  - figma_rename_node
-  - figma_move_node
-  - figma_resize_node
-  - figma_capture_screenshot
-  - figma_get_selection
-  - figma_search_components
+  - use_figma
+  - get_metadata
+  - get_screenshot
+  - get_design_context
+  - search_design_system
 ---
 
 # Screen Creator
@@ -45,7 +38,7 @@ Antes de crear cualquier pantalla:
 Before creating any screen, discover the project's layout by scanning an existing screen:
 
 ```javascript
-// Run via figma_execute on the target page
+// Run via use_figma on the target page
 const page = figma.currentPage;
 const reference = page.children.find(c => c.type === 'FRAME');
 const shell = {
@@ -79,7 +72,7 @@ NUNCA crear una pantalla desde cero.
 ```
 
 1. Identificar la pantalla más similar al objetivo
-2. Usar `figma_clone_node` para duplicar
+2. Usar `use_figma` con `node.clone()` para duplicar
 3. Renombrar con convención: `{sección} / {acción}`
    - Ejemplos: `Users / Lista`, `Roles / Editar Permisos`, `Bodas / Crear Item`
 
@@ -121,7 +114,7 @@ if (newFrame.x + newFrame.width > 5000) {
 
 ### Paso 5: Validar
 
-1. Tomar screenshot con `figma_capture_screenshot`
+1. Tomar screenshot con `get_screenshot` (o `figma_capture_screenshot` si figma-console-mcp esta disponible)
 2. Verificar:
    - [ ] Sidebar presente y con item activo correcto
    - [ ] Header con logo y usuario

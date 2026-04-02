@@ -7,10 +7,19 @@ FigmaSync is a project-agnostic toolkit. It works with any UI framework (Ant Des
 ## Prerequisites
 
 1. **Claude Code** installed and configured
-2. **Figma Desktop** app (not web — needed for plugin bridge)
-3. **Figma Personal Access Token** (Settings > Personal access tokens, starts with `figd_`)
+2. **Figma account** with access to the files you want to work with
 
-## Step 1: Install figma-console-mcp
+## Step 1: Configure Figma Remote MCP
+
+```bash
+claude mcp add --transport http figma-remote https://mcp.figma.com/mcp
+```
+
+This enables all read and write operations via `use_figma`, `get_metadata`, `get_screenshot`, `get_design_context`, `search_design_system`, etc.
+
+## Step 2 (Optional): Install figma-console-mcp for Lint and Real-time Screenshots
+
+Only needed if you want `figma_lint_design` (WCAG audit) and `figma_capture_screenshot` (real-time screenshots via plugin):
 
 ```bash
 claude mcp add figma-console -s user \
@@ -19,17 +28,7 @@ claude mcp add figma-console -s user \
   -- npx -y figma-console-mcp@latest
 ```
 
-## Step 2: Install Desktop Bridge Plugin
-
-1. Open Figma Desktop
-2. Go to **Plugins > Development > Import plugin from manifest...**
-3. Navigate to the manifest file:
-   ```bash
-   npx figma-console-mcp@latest --print-path
-   # Then find: figma-desktop-bridge/manifest.json
-   ```
-4. Run the plugin in your Figma file
-5. Verify: green dot "MCP ready"
+This requires Figma Desktop + Desktop Bridge plugin. **This step is entirely optional.**
 
 ## Step 3: Copy Skills to Your Project
 
@@ -118,36 +117,33 @@ This will:
 
 ## Skill Reference
 
-| Skill | Purpose | Needs Figma Desktop Bridge? |
+| Skill | Purpose | Needs Desktop Bridge? |
 |---|---|---|
-| `figma-sync` | Orchestrator — routes to correct sub-skill | Yes |
-| `screen-creator` | Create new screens from existing patterns | Yes |
-| `component-library-sync` | Organize component library | Yes |
-| `token-sync` | Sync design tokens bidirectionally | Yes |
+| `figma-sync` | Orchestrator — routes to correct sub-skill | No (`use_figma`) |
+| `screen-creator` | Create new screens from existing patterns | No (`use_figma`) |
+| `component-library-sync` | Organize component library | No (`use_figma`) |
+| `token-sync` | Sync design tokens bidirectionally | No (`use_figma`) |
 | `ui-framework-patterns` | CRUD patterns for your UI framework | No (reference only) |
-| `variant-generator` | Generate variants from code props | Yes |
-| `figma-quality-gate` | Post-creation quality validation | Yes |
-| `design-normalizer` | Audit Figma file health | Read-only OK |
-| `drift-detection` | Compare Figma vs production | Read-only OK |
-| `code-connect-bridge` | Map Figma components to code | Read-only + Code Connect API |
+| `variant-generator` | Generate variants from code props | No (`use_figma`) |
+| `figma-quality-gate` | Post-creation quality validation | Optional (for `figma_lint_design`) |
+| `design-normalizer` | Audit Figma file health | No (read-only) |
+| `drift-detection` | Compare Figma vs production | No (read-only) |
+| `code-connect-bridge` | Map Figma components to code | No (read + Code Connect API) |
 
 ## Troubleshooting
 
-### "Cannot connect to Figma Desktop"
-1. Verify Desktop Bridge plugin is running (green dot)
-2. Check no stale processes: `lsof -i :9223`
-3. Kill stale processes and restart Claude Code
-
-### "Port conflict"
-Another instance is using port 9223. Kill it:
+### "`use_figma` not available"
+Verify Figma Remote MCP is configured:
 ```bash
-kill $(lsof -t -i :9223)
+claude mcp add --transport http figma-remote https://mcp.figma.com/mcp
 ```
-Then restart Claude Code.
+Then verify authentication with `whoami()`.
 
 ### "Skills don't know my patterns"
 Run `/design-normalizer` first — it teaches other skills about your file structure.
 
-### "Write operations fail but reads work"
-Writes go through the Desktop Bridge plugin (WebSocket). Reads use the REST API (token).
-Make sure the plugin is running in Figma Desktop.
+### "Write operations fail"
+Verify that `use_figma` has access to the file. Make sure to load `/figma-use` before executing complex scripts.
+
+### "figma_lint_design not available" (optional)
+This tool requires figma-console-mcp with Desktop Bridge. It is optional — you can validate designs manually with `get_screenshot` and `get_metadata` instead.

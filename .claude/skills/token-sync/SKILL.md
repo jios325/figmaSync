@@ -9,12 +9,11 @@ triggers:
   - "codigo a figma tokens"
   - "actualiza variables de figma"
 tools:
-  - figma_get_variables
-  - figma_setup_design_tokens
-  - figma_batch_create_variables
-  - figma_batch_update_variables
-  - figma_create_variable_collection
-  - figma_browse_tokens
+  - use_figma
+  - get_metadata
+  - get_screenshot
+  - get_variable_defs
+  - search_design_system
 ---
 
 # Token Sync
@@ -34,7 +33,7 @@ Cuando el archivo Figma no tiene proyecto de codigo asociado, o se esta normaliz
 ### Paso 1: Escanear colores reales del archivo
 
 ```javascript
-// figma_execute: traverse ALL nodes, extract unique hex values with counts
+// via use_figma: traverse ALL nodes, extract unique hex values with counts
 const colorMap = {};
 function toHex(c) { return `#${Math.round(c.r*255).toString(16).padStart(2,'0')}${Math.round(c.g*255).toString(16).padStart(2,'0')}${Math.round(c.b*255).toString(16).padStart(2,'0')}`.toUpperCase(); }
 function scan(node) {
@@ -54,13 +53,11 @@ figma.root.children.forEach(p => p.children.forEach(scan));
 
 ### Paso 2: Crear coleccion Primitives
 
-Solo Light mode por defecto. Incluir TODOS los colores del archivo:
-```
-figma_setup_design_tokens({
-  collectionName: "Primitives",
-  modes: ["Default"],
-  tokens: [/* uno por cada hex unico, agrupado por familia */]
-})
+Solo Light mode por defecto. Incluir TODOS los colores del archivo via `use_figma`:
+```javascript
+// via use_figma: crear coleccion Primitives con figma.variables.* API
+const collection = figma.variables.createVariableCollection("Primitives");
+// crear una variable por cada hex unico, agrupado por familia
 ```
 
 Naming convention para Primitives:
@@ -72,26 +69,18 @@ Naming convention para Primitives:
 
 ### Paso 3: Crear coleccion Semantic
 
-Mapear colores por USO, no por valor:
-```
-figma_setup_design_tokens({
-  collectionName: "Semantic",
-  modes: ["Default"],
-  tokens: [
-    // Backgrounds
-    { name: "color/bg/page", values: { Default: "#F0F0F0" } },
-    { name: "color/bg/primary", values: { Default: "#FFFFFF" } },
-    // Text
-    { name: "color/text/primary", values: { Default: "#262626" } },
-    // Borders, Actions, Feedback, Brand...
-  ]
-})
+Mapear colores por USO, no por valor via `use_figma`:
+```javascript
+// via use_figma: crear coleccion Semantic con figma.variables.* API
+const semantic = figma.variables.createVariableCollection("Semantic");
+// crear variables semanticas que referencian a Primitives
+// color/bg/page, color/bg/primary, color/text/primary, etc.
 ```
 
 ### Paso 4: Aplicar variables a todos los nodos (batch por pagina)
 
 ```javascript
-// figma_execute (UNO POR PAGINA para evitar timeout de 30s)
+// via use_figma (UNO POR PAGINA para evitar timeout de 30s)
 // 1. Build hex → variable map (Semantic priority, then Primitives)
 // 2. Traverse all nodes recursively
 // 3. For each SOLID fill without existing binding:
@@ -117,7 +106,7 @@ Screenshot de 3+ pantallas. Deben verse IDENTICAS a antes de tokenizar.
 
 ### 1. NUNCA usar colores del codigo como fuente de verdad
 Los colores del codigo (Ant Design, Tailwind, etc.) pueden diferir del diseno.
-Siempre escanear los hex reales del archivo Figma con `figma_execute`.
+Siempre escanear los hex reales del archivo Figma via `use_figma`.
 
 ### 2. Mismo hex ≠ mismo significado semantico
 Un color como `#364546` puede usarse para:
@@ -156,7 +145,7 @@ La aplicacion por contexto resuelve esto aplicando variables segun el ROL del no
 ### Paso 1: Clasificar nodos por rol
 
 ```javascript
-// figma_execute: traverse nodes, classify by name/structure/type
+// via use_figma: traverse nodes, classify by name/structure/type
 function classifyNode(node) {
   const name = node.name.toLowerCase();
   const parentName = node.parent?.name?.toLowerCase() || '';
@@ -230,7 +219,7 @@ Before syncing, discover what exists on both sides:
 ### 1. Discover Figma Tokens
 
 ```
-figma_get_variables({ format: "summary" })
+get_variable_defs(nodeId: "0:1", fileKey: "{fileKey}")
 ```
 
 Record: collections, modes (Light/Dark), token categories present.
@@ -275,7 +264,7 @@ Read project's CLAUDE.md to identify the UI framework, then locate token source:
 ### Paso 1: Extraer tokens de Figma
 
 ```
-figma_get_variables → lista completa de tokens
+get_variable_defs(nodeId, fileKey) → lista completa de tokens
 ```
 
 ### Paso 2: Comparar con codigo
@@ -299,7 +288,7 @@ Leer el archivo de tema del proyecto:
 
 Segun direccion:
 - **Figma es fuente de verdad**: Actualizar codigo
-- **Codigo es fuente de verdad**: Actualizar Figma con `figma_batch_update_variables`
+- **Codigo es fuente de verdad**: Actualizar Figma via `use_figma` con `figma.variables.*` API
 
 ## Proceso: Codigo → Figma
 
@@ -317,17 +306,12 @@ import tailwindConfig from 'tailwind.config.ts';
 
 ### Paso 2: Crear/actualizar colecciones en Figma
 
-```
-figma_setup_design_tokens({
-  collectionName: 'CMS Tokens',
-  modes: ['Light'],
-  tokens: [
-    { name: 'color/primary', resolvedType: 'COLOR', values: { Light: '#1890FF' } },
-    { name: 'color/bg/content', resolvedType: 'COLOR', values: { Light: '#F5F5F5' } },
-    { name: 'spacing/sm', resolvedType: 'FLOAT', values: { Light: 8 } },
-    ...
-  ]
-})
+```javascript
+// via use_figma: crear colecciones y variables con figma.variables.* API
+const collection = figma.variables.createVariableCollection("CMS Tokens");
+const colorPrimary = figma.variables.createVariable("color/primary", collection, "COLOR");
+colorPrimary.setValueForMode(collection.defaultModeId, { r: 0.094, g: 0.565, b: 1, a: 1 });
+// ... crear variables para color/bg/content, spacing/sm, etc.
 ```
 
 ### Paso 3: Aplicar tokens a componentes

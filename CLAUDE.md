@@ -8,28 +8,26 @@ Toolkit de agentes AI para sincronizacion bidireccional Figma <-> Codigo.
 No es una app — son skills, runbooks y prompts que Claude Code interpreta para operar sobre Figma.
 Funciona con CUALQUIER proyecto, framework o libreria UI.
 
-## Stack MCP (Dos Canales)
+## Stack MCP
 
 | MCP | Canal | Funcion |
 |-----|-------|---------|
-| **figma-console-mcp** | WebSocket (Plugin API) | ESCRITURA: crear, mover, eliminar, renombrar, redimensionar nodes |
-| **Figma Remote** | HTTP REST (PAT token) | LECTURA: metadata, screenshots, design context, Code Connect |
+| **Figma Remote** | HTTP REST | LECTURA + ESCRITURA: `use_figma` (writes), `get_metadata`, `get_screenshot`, `get_design_context`, `search_design_system`, etc. |
 | **GitNexus** | Local (opcional) | Analisis de impacto en codigo, descubrimiento de componentes |
+| **figma-console-mcp** | WebSocket (opcional, legacy) | Solo para `figma_lint_design` y `figma_capture_screenshot` real-time. Requiere Figma Desktop + Desktop Bridge |
 
 **Arquitectura de conexion:**
 ```
-Figma Desktop <--WebSocket:9223--> figma-console-mcp <--> Claude Code  (ESCRITURA)
-PAT Token --> REST API --> Figma Cloud                                  (LECTURA)
+Figma Cloud <--HTTP REST--> Figma Remote MCP <--> Claude Code  (LECTURA + ESCRITURA)
 ```
 
 ## Reglas Criticas
 
-- **Canal primario de escritura: `use_figma`** (Figma Remote MCP via HTTP). No requiere Desktop Bridge ni Figma Desktop
-- **NUNCA bloquear pidiendo Desktop Bridge.** Si `figma-console-mcp` no esta disponible, continuar con `use_figma`
-- **figma-console-mcp es OPCIONAL** — solo necesario para `figma_lint_design` y `figma_capture_screenshot` (real-time). Si no esta configurado, ignorar
+- **Canal de escritura: `use_figma`** (Figma Remote MCP via HTTP). No requiere Desktop Bridge ni Figma Desktop
 - Antes de CUALQUIER `use_figma`, cargar `/figma-use` con las 17 reglas pre-flight del Plugin API
 - Antes de crear componentes, buscar con `search_design_system` en librerias publicadas
 - Solo 2 operaciones requieren intervencion manual: copiar entre archivos Figma e importar librerias externas
+- **figma-console-mcp es OPCIONAL** — solo aporta `figma_lint_design` y `figma_capture_screenshot` (real-time). Si no esta configurado, ignorar
 
 ## Parseo de URLs de Figma
 
@@ -118,28 +116,33 @@ Todos los skills se adaptan al proyecto destino leyendo:
 2. El CLAUDE.md del proyecto destino — convenciones, stack, reglas
 3. El codigo del proyecto — componentes, props, estilos
 
-## Referencia de Herramientas Figma Console
+## Referencia de Herramientas
 
-**Operaciones sobre nodes:** `figma_create_child`, `figma_delete_node`, `figma_rename_node`, `figma_move_node`, `figma_resize_node`, `figma_clone_node`, `figma_set_text`, `figma_set_fills`, `figma_set_strokes`
+### Figma Remote MCP (canal principal)
 
-**Componentes:** `figma_instantiate_component`, `figma_search_components`, `figma_get_component_details`, `figma_set_instance_properties`
+**Escritura:** `use_figma(fileKey, code, description)` — ejecuta JS Plugin API via HTTP. Permite crear frames, componentes, variables, auto layout, aplicar fills/strokes, instanciar componentes, renombrar, mover, eliminar nodes, etc.
 
-**Variables/tokens:** `figma_setup_design_tokens` (crear coleccion + modes + variables en UNA llamada), `figma_batch_create_variables` (hasta 100), `figma_batch_update_variables`
+**Lectura:** `get_metadata`, `get_screenshot`, `get_design_context`, `get_variable_defs`, `search_design_system`, `get_code_connect_map`, `get_code_connect_suggestions`, `get_context_for_code_connect`, `whoami`
 
-**Lectura:** `figma_get_status`, `figma_get_selection`, `figma_get_file_data`, `figma_lint_design`, `figma_capture_screenshot`
+**Code Connect:** `send_code_connect_mappings`, `add_code_connect_map`
+
+**Otros:** `create_new_file`, `generate_figma_design`
+
+### figma-console-mcp (opcional, legacy)
+
+**Solo disponible con Desktop Bridge:** `figma_lint_design` (auditoria WCAG + calidad), `figma_capture_screenshot` (screenshot real-time via plugin)
 
 ## Troubleshooting
 
-**"No conecta a Figma Desktop"**: Verificar que el plugin Desktop Bridge esta corriendo (punto verde). Buscar procesos zombi: `lsof -i :9223`. Matar y reiniciar si es necesario.
+**`use_figma` no disponible**: Verificar que Figma Remote MCP esta configurado: `claude mcp add --transport http figma-remote https://mcp.figma.com/mcp`. Verificar autenticacion con `whoami()`.
 
-**"Las escrituras fallan pero las lecturas funcionan"**: Las escrituras necesitan el plugin Desktop Bridge (WebSocket). Las lecturas usan REST API (token). Verificar que el plugin este corriendo en Figma Desktop.
+**Escrituras fallan**: Verificar que `use_figma` tiene acceso al archivo. Asegurarse de cargar `/figma-use` antes de ejecutar scripts complejos.
 
-**"Conflicto de puerto"**: `kill $(lsof -t -i :9223)` y reiniciar Claude Code.
+**Extended Collections falla**: Requiere plan Enterprise. Fallback: usar modes dentro de una coleccion (max 4 en Professional).
 
 ## Adopcion en Proyectos Nuevos
 
 Ver `docs/how-to-adopt.md` para la guia completa. Quick start:
 1. Copiar `.claude/skills/` a tu proyecto
-2. Configurar `figma-console-mcp` con tu Figma PAT
-3. Abrir el plugin Desktop Bridge en tu archivo de Figma
-4. Ejecutar `/design-normalizer` para auditar el estado actual
+2. Configurar Figma Remote MCP: `claude mcp add --transport http figma-remote https://mcp.figma.com/mcp`
+3. Ejecutar `/design-normalizer` para auditar el estado actual

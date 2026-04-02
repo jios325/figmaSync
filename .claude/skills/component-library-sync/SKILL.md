@@ -9,15 +9,11 @@ triggers:
   - "nuevo componente para la libreria"
   - "component to design system"
 tools:
-  - figma_execute
-  - figma_rename_node
-  - figma_move_node
-  - figma_resize_node
-  - figma_arrange_component_set
-  - figma_add_component_property
-  - figma_capture_screenshot
-  - figma_search_components
-  - figma_get_design_system_summary
+  - use_figma
+  - get_metadata
+  - get_screenshot
+  - get_design_context
+  - search_design_system
 ---
 
 # Component Library Sync
@@ -137,13 +133,8 @@ NO usar:
 Si el componente tiene estados o variantes:
 
 ```javascript
-// Agregar propiedades de componente
-figma_add_component_property({
-  nodeId: componentId,
-  propertyName: 'State',
-  type: 'VARIANT',
-  defaultValue: 'Default'
-});
+// via use_figma: agregar propiedades de componente
+// Usar figma.variables.* o component.addComponentProperty() API
 ```
 
 ### Paso 7: Documentar
@@ -239,7 +230,7 @@ for (const category of categories) {
 
 Si hay componentes fuera de "Componentes Locales" en la página Design System:
 
-1. Identificarlos con `figma_execute` (findAll type=COMPONENT fuera de la sección)
+1. Identificarlos via `use_figma` (findAll type=COMPONENT fuera de la sección)
 2. Clasificarlos por categoría
 3. Moverlos dentro de la sección
 4. Posicionar en la categoría correcta

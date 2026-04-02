@@ -9,14 +9,11 @@ triggers:
   - "faltan variantes"
   - "component states"
 tools:
-  - figma_execute
-  - figma_clone_node
-  - figma_arrange_component_set
-  - figma_add_component_property
-  - figma_set_fills
-  - figma_set_text
-  - figma_rename_node
-  - figma_capture_screenshot
+  - use_figma
+  - get_metadata
+  - get_screenshot
+  - get_design_context
+  - search_design_system
 ---
 
 # Variant Generator
@@ -93,15 +90,8 @@ clone.name = "Type=Primary, State=Hover";
 ### Paso 5: Organizar como Component Set
 
 ```javascript
-// Si es un componente suelto, convertir a component set
-figma_arrange_component_set({
-  componentSetId: componentSet.id,
-  options: {
-    gap: 24,
-    cellPadding: 20,
-    columnProperty: 'State' // Estados como columnas
-  }
-});
+// via use_figma: si es un componente suelto, convertir a component set
+// Usar figma.combineAsVariants() y luego configurar layout del set
 ```
 
 ### Paso 6: Registrar en libreria

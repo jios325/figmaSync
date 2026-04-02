@@ -156,49 +156,45 @@ No se instala nada. No hay servidor propio. Solo archivos `.md` que Claude Code 
           └─────────────┘
 ```
 
-## Capacidades de escritura (figma-console-mcp)
+## Capacidades de escritura (Figma Remote MCP — `use_figma`)
 
-Con la adicion de figma-console-mcp, el sistema ahora tiene **acceso completo de escritura** a Figma:
+Con `use_figma` (Figma Remote MCP), el sistema tiene **acceso completo de escritura** a Figma sin necesidad de Desktop Bridge:
 
-| Operacion | Herramienta | Antes | Ahora |
-|-----------|-------------|-------|-------|
-| Crear paginas | `figma_execute` | Manual | Automatizado |
-| Mover frames entre paginas | `figma_execute` | Manual | Automatizado |
-| Eliminar nodes | `figma_delete_node` | Manual | Automatizado |
-| Renombrar layers | `figma_rename_node` | Manual | Automatizado |
-| Crear componentes | `figma_create_child` + `figma_execute` | Manual | Automatizado |
-| Instanciar componentes | `figma_instantiate_component` | Manual | Automatizado |
-| Crear variables/tokens | `figma_setup_design_tokens` | Manual | Automatizado |
-| Lint/audit de diseno | `figma_lint_design` | Manual | Automatizado |
-| Resize nodes | `figma_resize_node` | Manual | Automatizado |
-| Set fills/strokes | `figma_set_fills` / `figma_set_strokes` | Manual | Automatizado |
-| Clonar nodes | `figma_clone_node` | Manual | Automatizado |
-| Capturar screenshots | `figma_capture_screenshot` | Solo REST | Plugin (real-time) |
+| Operacion | Herramienta | Canal |
+|-----------|-------------|-------|
+| Crear paginas | `use_figma` (figma.createPage()) | Figma Remote (HTTP) |
+| Mover frames entre paginas | `use_figma` (node.parent = page) | Figma Remote (HTTP) |
+| Eliminar nodes | `use_figma` (node.remove()) | Figma Remote (HTTP) |
+| Renombrar layers | `use_figma` (node.name = ...) | Figma Remote (HTTP) |
+| Crear componentes | `use_figma` (figma.createComponent()) | Figma Remote (HTTP) |
+| Instanciar componentes | `use_figma` (importComponentByKeyAsync()) | Figma Remote (HTTP) |
+| Crear variables/tokens | `use_figma` (figma.variables.*) | Figma Remote (HTTP) |
+| Resize nodes | `use_figma` (node.resize()) | Figma Remote (HTTP) |
+| Set fills/strokes | `use_figma` (node.fills = ...) | Figma Remote (HTTP) |
+| Clonar nodes | `use_figma` (node.clone()) | Figma Remote (HTTP) |
+| Lint/audit de diseno | `figma_lint_design` | figma-console-mcp (opcional) |
+| Capturar screenshots real-time | `figma_capture_screenshot` | figma-console-mcp (opcional) |
 
 ### Arquitectura de conexion
 
 ```
-figma-console-mcp usa DOS canales:
-  1. REST API (via PAT token) → LECTURA: file data, components, styles
-  2. Desktop Bridge Plugin (via WebSocket) → ESCRITURA: Plugin API completo
+Figma Remote MCP (HTTP):
+  use_figma(fileKey, code, description) → ejecuta JS Plugin API via HTTP
+  No requiere Desktop Bridge ni Figma Desktop
 
-El Plugin API de Figma tiene acceso TOTAL al documento:
-  - figma.createFrame(), figma.createText(), figma.createComponent()
-  - node.remove(), node.name =, node.resize()
-  - figma.root.children (pages), figma.currentPage
-  - figma.variables.*, figma.teamLibrary.*
+figma-console-mcp (OPCIONAL, legacy):
+  Solo aporta figma_lint_design y figma_capture_screenshot (real-time)
+  Requiere Figma Desktop + Desktop Bridge plugin
 ```
 
 ## Limitaciones conocidas
 
-1. **figma-console-mcp** requiere Figma Desktop (no web app) con el plugin corriendo
-2. La captura con `generate_figma_design` es de **web** unicamente (no mobile nativo)
-3. Code Connect requiere que Figma tenga componentes bien definidos (no frames sueltos)
-4. GitNexus necesita el indice actualizado (`npx gitnexus analyze`)
-5. La comparacion visual depende de la capacidad multimodal de Claude (no es pixel-perfect)
-6. `generate_figma_design` necesita que el servidor local este corriendo
-7. El plugin Desktop Bridge debe estar abierto en el archivo Figma que se quiere editar
-8. Solo UN archivo Figma activo por conexion WebSocket (cambiar con `figma_navigate`)
+1. La captura con `generate_figma_design` es de **web** unicamente (no mobile nativo)
+2. Code Connect requiere que Figma tenga componentes bien definidos (no frames sueltos)
+3. GitNexus necesita el indice actualizado (`npx gitnexus analyze`)
+4. La comparacion visual depende de la capacidad multimodal de Claude (no es pixel-perfect)
+5. `generate_figma_design` necesita que el servidor local este corriendo
+6. `figma_lint_design` y `figma_capture_screenshot` solo disponibles con figma-console-mcp (opcional)
 # Flujo de Ejecucion — Skills + MCP Tools
 
 ## Setup Minimo (sin Desktop Bridge)
@@ -566,90 +562,34 @@ Trigger: "Mapea los componentes de Figma con el codigo"
 | Bridge → Code Connect | Mappings persistidos en Figma |
 # Referencia de Herramientas MCP para FigmaSync
 
-## Figma Console MCP (`figma-console-mcp`) — ESCRITURA
+## Figma Remote MCP (`mcp.figma.com`) — Canal Principal
 
 ### Setup
 ```bash
-claude mcp add figma-console -s user -e FIGMA_ACCESS_TOKEN=figd_XXX -e ENABLE_MCP_APPS=true -- npx -y figma-console-mcp@latest
+claude mcp add --transport http figma-remote https://mcp.figma.com/mcp
 ```
 
-### Plugin Desktop Bridge
-- Importar en Figma Desktop: Plugins > Development > Import plugin from manifest
-- Manifest: `npx figma-console-mcp@latest --print-path` → `figma-desktop-bridge/manifest.json`
-- Conexion via WebSocket en puertos 9223-9232 (multi-instancia)
+### Herramienta de escritura principal: `use_figma`
 
-### Herramientas de escritura (59+ disponibles)
+`use_figma(fileKey, code, description)` ejecuta JS Plugin API via HTTP. Permite todas las operaciones de escritura sin necesidad de Desktop Bridge:
 
-#### Operaciones sobre nodes
-| Herramienta | Funcion |
+| Operacion | Codigo Plugin API |
 |---|---|
-| `figma_execute` | Ejecutar JS arbitrario en contexto del plugin (crear paginas, mover nodes entre paginas) |
-| `figma_create_child` | Crear RECTANGLE, ELLIPSE, FRAME, TEXT, LINE dentro de un parent |
-| `figma_delete_node` | Eliminar un node |
-| `figma_rename_node` | Renombrar un node |
-| `figma_move_node` | Mover un node a posicion x,y |
-| `figma_resize_node` | Redimensionar un node |
-| `figma_clone_node` | Duplicar un node |
-| `figma_set_text` | Cambiar texto de un text node |
-| `figma_set_fills` | Cambiar colores de fill |
-| `figma_set_strokes` | Cambiar bordes |
-| `figma_set_image_fill` | Aplicar imagen como fill (base64 o path) |
-
-#### Componentes
-| Herramienta | Funcion |
-|---|---|
-| `figma_instantiate_component` | Instanciar un componente del design system |
-| `figma_search_components` | Buscar componentes por nombre/categoria |
-| `figma_get_component_details` | Detalles de un componente (variantes, props) |
-| `figma_set_instance_properties` | Cambiar props de una instancia |
-| `figma_add_component_property` | Agregar propiedad a un componente |
-| `figma_arrange_component_set` | Reorganizar component set con grid |
-
-#### Variables y tokens
-| Herramienta | Funcion |
-|---|---|
-| `figma_setup_design_tokens` | Crear coleccion + modes + variables en UNA llamada |
-| `figma_batch_create_variables` | Crear hasta 100 variables a la vez |
-| `figma_batch_update_variables` | Actualizar hasta 100 valores a la vez |
-| `figma_create_variable` | Crear una variable individual |
-| `figma_update_variable` | Actualizar un valor |
-| `figma_delete_variable` | Eliminar variable |
-| `figma_create_variable_collection` | Crear coleccion vacia |
-| `figma_add_mode` | Agregar modo (Light/Dark) |
-
-#### Lectura y validacion
-| Herramienta | Funcion |
-|---|---|
-| `figma_get_status` | Verificar conexion WebSocket |
-| `figma_get_selection` | Nodos seleccionados por el usuario |
-| `figma_get_design_changes` | Cambios recientes en el documento |
-| `figma_capture_screenshot` | Screenshot via plugin (estado real, no cache) |
-| `figma_take_screenshot` | Screenshot via REST API |
-| `figma_get_file_data` | Arbol del documento con profundidad controlada |
-| `figma_lint_design` | Audit WCAG + calidad de diseno |
-| `figma_get_variables` | Leer variables con resolucion de aliases |
-| `figma_get_styles` | Leer estilos (color, texto, efectos) |
-| `figma_get_design_system_kit` | Tokens + componentes + estilos en UNA llamada |
-| `figma_get_design_system_summary` | Resumen compacto del design system |
-
-#### Comentarios
-| Herramienta | Funcion |
-|---|---|
-| `figma_get_comments` | Leer comentarios del archivo |
-| `figma_post_comment` | Postear comentario (pinned a un node) |
-| `figma_delete_comment` | Eliminar comentario |
-
-#### Consola y debugging
-| Herramienta | Funcion |
-|---|---|
-| `figma_get_console_logs` | Logs del plugin |
-| `figma_watch_console` | Stream de logs en real-time |
-| `figma_reload_plugin` | Recargar plugin |
-| `figma_reconnect` | Forzar reconexion |
+| Crear paginas | `figma.createPage()` |
+| Mover frames entre paginas | `page.appendChild(frame)` |
+| Eliminar nodes | `node.remove()` |
+| Renombrar layers | `node.name = '...'` |
+| Crear componentes | `figma.createComponent()` |
+| Instanciar componentes de libreria | `figma.importComponentByKeyAsync(key)` |
+| Crear variables/tokens | `figma.variables.createVariableCollection()`, `figma.variables.createVariable()` |
+| Resize nodes | `node.resize(w, h)` |
+| Set fills/strokes | `node.fills = [...]`, `node.strokes = [...]` |
+| Clonar nodes | `node.clone()` |
+| Set texto | `textNode.characters = '...'` |
 
 ### Ejemplo: Crear pagina y mover frame
 ```javascript
-// figma_execute:
+// via use_figma:
 await figma.loadAllPagesAsync();
 const newPage = figma.createPage();
 newPage.name = 'Feature Detail';
@@ -664,7 +604,7 @@ return { pageId: newPage.id, pageName: newPage.name };
 
 ### Ejemplo: Renombrar en batch
 ```javascript
-// figma_execute:
+// via use_figma:
 const page = figma.currentPage;
 const frames = page.children.filter(n => n.type === 'FRAME');
 const renames = [];
@@ -678,9 +618,20 @@ for (const f of frames) {
 return { renamed: renames.length, details: renames };
 ```
 
+## figma-console-mcp (OPCIONAL, legacy)
+
+Solo necesario para `figma_lint_design` (auditoria WCAG + calidad) y `figma_capture_screenshot` (screenshot real-time via plugin).
+
+```bash
+# Instalacion opcional:
+claude mcp add figma-console -s user -e FIGMA_ACCESS_TOKEN=figd_XXX -e ENABLE_MCP_APPS=true -- npx -y figma-console-mcp@latest
+```
+
+Requiere Figma Desktop + Desktop Bridge plugin corriendo.
+
 ---
 
-## Figma Remote MCP (`mcp.figma.com`)
+## Figma Remote MCP — Herramientas de Lectura
 
 ### Setup
 ```bash

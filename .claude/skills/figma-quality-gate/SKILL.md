@@ -10,11 +10,11 @@ triggers:
   - "figma lint"
   - "verifica diseño"
 tools:
-  - figma_execute
-  - figma_lint_design
-  - figma_capture_screenshot
-  - figma_get_selection
-  - figma_get_file_data
+  - use_figma
+  - get_metadata
+  - get_screenshot
+  - get_design_context
+  - search_design_system
 ---
 
 # Figma Quality Gate
@@ -75,7 +75,7 @@ Validacion automatizada de calidad para pantallas de Figma.
 ### Paso 1: Validacion automatica
 
 ```javascript
-// Ejecutar en figma_execute
+// Ejecutar via use_figma
 const frame = await figma.getNodeByIdAsync(frameId);
 const results = {
   structure: {},
@@ -135,11 +135,12 @@ Tomar screenshot y verificar visualmente:
 ### Paso 3: Lint de diseño
 
 ```
-figma_lint_design({
+figma_lint_design({  (solo con figma-console-mcp, opcional)
   nodeId: frameId,
   rules: ['all']
 })
 ```
+Alternativa sin figma-console-mcp: verificar manualmente con `get_screenshot` y `get_metadata`.
 
 Verificar:
 - Contraste WCAG (AA minimo)
