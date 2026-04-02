@@ -7,9 +7,9 @@ Funciona con **cualquier** proyecto, framework o libreria UI.
 ## Prerequisitos
 
 - [Claude Code](https://claude.ai/code) instalado
-- Figma Desktop (NO web app)
 - Figma Personal Access Token (PAT)
-- Plugin Desktop Bridge corriendo en Figma (punto verde)
+- **Opcion A:** Figma Desktop + plugin Desktop Bridge (escritura primaria)
+- **Opcion B:** Figma Remote MCP con `use_figma` (sin Desktop Bridge, beta)
 
 ## Quick Start
 
@@ -17,17 +17,28 @@ Funciona con **cualquier** proyecto, framework o libreria UI.
 # 1. Copiar skills a tu proyecto
 cp -r .claude/skills/ ~/tu-proyecto/.claude/skills/
 
-# 2. Configurar figma-console-mcp (escritura)
-claude mcp add figma-console -- npx -y figma-console-mcp@latest
+# 2. Configurar figma-console-mcp (escritura primaria — requiere Figma Desktop)
+claude mcp add figma-console -s user \
+  -e FIGMA_ACCESS_TOKEN=figd_YOUR_TOKEN \
+  -e ENABLE_MCP_APPS=true \
+  -- npx -y figma-console-mcp@latest
 
-# 3. Configurar Figma Remote (lectura via REST API)
+# 3. Configurar Figma Remote (lectura + escritura alternativa via use_figma)
 claude mcp add --transport http figma-remote https://mcp.figma.com/mcp
 
 # 4. Abrir Desktop Bridge en tu archivo Figma → verificar punto verde
+#    (o saltear si usas solo use_figma como canal de escritura)
 
 # 5. Auditar el archivo
 /design-normalizer
 ```
+
+### Deteccion automatica de canal
+
+El orquestador (`/figma-sync`) detecta automaticamente que canal de escritura usar:
+1. `figma_get_status` OK → **figma-console-mcp** (primario: 15+ tools, lint, screenshots real-time)
+2. Else `use_figma` disponible → **use_figma** (fallback: sin Desktop Bridge)
+3. Else → **modo read-only**
 
 ## Pipeline de Normalizacion (orden estricto)
 
@@ -49,7 +60,7 @@ Renombra layers genericos ("Frame 123" → nombres semanticos), aplana nesting e
 ```
 /token-sync
 ```
-Extrae los colores **reales del diseno** (no del codigo), crea colecciones Primitives + Semantic, y aplica variables a todos los nodos. La apariencia visual NO cambia.
+Extrae los colores **reales del diseno** (no del codigo), crea colecciones Primitives + Semantic, y aplica variables a todos los nodos. La apariencia visual NO cambia. Soporta Extended Variable Collections para theming multi-brand (Enterprise).
 
 ### Paso 4: Auto Layout
 ```
@@ -61,13 +72,13 @@ Convierte layouts de posicion absoluta a Auto Layout (Flexbox). Bottom-up: atomo
 ```
 /component-library-sync
 ```
-Identifica patrones repetidos, extrae componentes, crea pagina Design System, reemplaza copias con instancias.
+Busca en librerias publicadas con `search_design_system` antes de crear. Identifica patrones repetidos, extrae componentes, crea pagina Design System, reemplaza copias con instancias.
 
 ### Paso 6: Validacion
 ```
 /figma-quality-gate
 ```
-Verifica naming, Auto Layout, tokens, consistencia. Score objetivo: >80/100.
+Verifica naming, Auto Layout, tokens, consistencia. Integra Check Designs linter nativo. Score objetivo: >80/100.
 
 > **REGLA:** Tokens ANTES de componentes. Siempre.
 > **REGLA:** Fuente de verdad de colores = el diseno, NUNCA el codigo.
@@ -75,6 +86,7 @@ Verifica naming, Auto Layout, tokens, consistencia. Score objetivo: >80/100.
 > **REGLA:** Mismo hex ≠ mismo significado. Revisar componente por componente despues del batch-apply.
 > **REGLA:** NUNCA borrar colecciones sin limpiar bindings primero. Preferir undo.
 > **REGLA:** Copiar componentes locales como referencia ANTES de tokenizar para comparar despues.
+> **REGLA:** Antes de CUALQUIER `use_figma`, cargar `/figma-use` con las 17 reglas pre-flight.
 
 ## Errores Comunes en Tokenizacion
 
@@ -87,20 +99,41 @@ Verifica naming, Auto Layout, tokens, consistencia. Score objetivo: >80/100.
 | Texto invisible en botones hover | Texto y fondo del mismo color | Verificar contraste en variantes hover/active |
 | Dark mode innecesario | Se crearon modes Light+Dark sin necesidad | Solo Light mode salvo indicacion explicita |
 
-## Todos los Skills (11)
+## Todos los Skills (15)
 
+### Prerequisitos
+| Skill | Tipo | Descripcion |
+|-------|------|-------------|
+| `/figma-use` | Ref | **OBLIGATORIO** antes de `use_figma`/`figma_execute`. 17 reglas pre-flight, gotchas, patrones, scripts JS helper |
+
+### Normalizacion
 | Skill | Tipo | Descripcion |
 |-------|------|-------------|
 | `/normalization-pipeline` | Write | Pipeline completo de normalizacion (6 fases) |
 | `/design-normalizer` | Read | Auditoria con score 0-100 |
-| `/token-sync` | Write | Crear y aplicar design tokens |
+
+### Creacion
+| Skill | Tipo | Descripcion |
+|-------|------|-------------|
+| `/screen-creator` | Write | Crear pantallas clonando hermanas, busca en librerias antes de crear |
 | `/component-library-sync` | Write | Organizar componentes en Design System |
-| `/screen-creator` | Write | Crear pantallas clonando hermanas |
 | `/variant-generator` | Write | Generar variantes desde props del codigo |
+| `/figma-create-new-file` | Write | Crear un nuevo archivo Figma (Design o FigJam) |
+
+### Sincronizacion
+| Skill | Tipo | Descripcion |
+|-------|------|-------------|
 | `/figma-sync` | Both | Orquestador bidireccional Figma ↔ Codigo |
-| `/code-connect-bridge` | Write | Mapear componentes Figma → codigo |
-| `/drift-detection` | Read | Comparar Figma vs produccion |
-| `/figma-quality-gate` | Read | Validacion post-creacion |
+| `/token-sync` | Write | Crear y aplicar design tokens. Soporta Extended Collections (Enterprise) |
+| `/code-connect-bridge` | Write | Mapear componentes Figma → codigo. Templates parserless avanzados |
+| `/design-system-rules-generator` | Write | Generar reglas de DS para CLAUDE.md/AGENTS.md/.cursor/rules |
+
+### Calidad
+| Skill | Tipo | Descripcion |
+|-------|------|-------------|
+| `/drift-detection` | Read | Comparar Figma vs produccion. Enriquecido con Library Analytics (Enterprise) |
+| `/figma-quality-gate` | Read | Validacion post-creacion. Integra Check Designs linter |
+| `/design-system-health` | Read | Dashboard: auditoria + Library Analytics + Code Connect coverage |
 | `/ui-framework-patterns` | Ref | Patrones CRUD por framework |
 
 ## Arquitectura
@@ -116,28 +149,48 @@ Verifica naming, Auto Layout, tokens, consistencia. Score objetivo: >80/100.
 │  │  Audit       │  │  Code→Figma  │  │  Screenshots │       │
 │  │  Cleanup     │  │  Bidireccional│  │  Comparacion │       │
 │  │  Tokenize    │  │              │  │  Reportes    │       │
-│  │  Auto Layout │  │              │  │              │       │
+│  │  Auto Layout │  │              │  │  + Analytics │       │
 │  │  Componentize│  │              │  │              │       │
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘       │
 │         │                 │                  │                │
 │  ┌──────┴─────────────────┴──────────────────┴──────┐       │
 │  │              CODE CONNECT BRIDGE                  │       │
 │  │   Mapeo automatico: Figma Node ↔ Code Component  │       │
+│  │   Templates parserless + MCP usage instructions   │       │
 │  └──────────────────────┬───────────────────────────┘       │
 │                          │                                    │
 │  ┌───────────────────────┴─────────────────────────────┐    │
-│  │               HERRAMIENTAS MCP (3 capas)             │    │
+│  │               HERRAMIENTAS MCP (3 canales)            │    │
 │  │                                                       │    │
 │  │  figma-console-mcp     Figma Remote      GitNexus    │    │
 │  │  (WebSocket:9223)      (REST API)        (Local)     │    │
-│  │  ESCRITURA             LECTURA           ANALISIS    │    │
+│  │  ESCRITURA PRIMARIA    LECTURA +         ANALISIS    │    │
+│  │                        ESCRITURA ALT.                 │    │
+│  │                        (use_figma)                    │    │
+│  └───────────────────────────────────────────────────────┘    │
+│                                                               │
+│  ┌───────────────────────────────────────────────────────┐    │
+│  │  /figma-use (prerequisito obligatorio para escritura) │    │
+│  │  17 reglas pre-flight + gotchas + 5 scripts JS helper │    │
 │  └───────────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-- **figma-console-mcp** (WebSocket): operaciones de escritura via Plugin API
-- **Figma Remote** (HTTP REST): operaciones de lectura via PAT token
+**3 canales MCP:**
+- **figma-console-mcp** (WebSocket): escritura primaria via Plugin API. Requiere Figma Desktop + Desktop Bridge
+- **Figma Remote — use_figma** (HTTP REST): escritura alternativa via Plugin API. Sin Desktop Bridge. Beta, sera de pago
+- **Figma Remote — lectura** (HTTP REST): metadata, screenshots, design context, Code Connect, search_design_system
 - **GitNexus** (local, opcional): analisis de impacto en codigo
+
+## Capacidades de Figma 2025-2026
+
+| Feature | Plan Requerido | Skills que lo Usan |
+|---------|---------------|-------------------|
+| Extended Variable Collections (theming multi-brand) | Enterprise | `/token-sync`, `/normalization-pipeline` |
+| Library Analytics API (uso de componentes) | Enterprise | `/drift-detection`, `/design-system-health` |
+| Code Connect UI nativa + MCP usage instructions | Organization+ | `/code-connect-bridge` |
+| Check Designs linter (raw values → variables) | Todos | `/figma-quality-gate`, `/design-normalizer` |
+| use_figma (escritura via MCP oficial) | Todos (beta) | Todos los skills de escritura |
 
 ## Troubleshooting
 
@@ -145,9 +198,11 @@ Verifica naming, Auto Layout, tokens, consistencia. Score objetivo: >80/100.
 |----------|----------|
 | Plugin muestra punto amarillo | Cerrar y re-abrir Desktop Bridge |
 | No conecta a Figma Desktop | `lsof -i :9223` — matar procesos zombi |
-| Escrituras fallan, lecturas ok | Desktop Bridge no esta corriendo |
+| Escrituras fallan, lecturas ok | Desktop Bridge no esta corriendo. Alternativa: usar `use_figma` |
 | Conflicto de puerto | `kill $(lsof -t -i :9223)` y reiniciar Claude Code |
 | Colores cambiaron al tokenizar | Los hex de las variables no coinciden con el diseno. Undo y re-escanear |
+| use_figma no disponible | Verificar: `claude mcp add --transport http figma-remote https://mcp.figma.com/mcp` |
+| Extended Collections falla | Requiere plan Enterprise. Fallback: usar modes (max 4 en Professional) |
 
 ## Adopcion en Proyectos Nuevos
 
