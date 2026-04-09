@@ -119,6 +119,14 @@ Para normalizar un archivo Figma desordenado, ejecutar EN ESTE ORDEN:
 | Componente resize rompe instancias | El resize del componente propaga pero instancias tienen overrides | Verificar dimensiones de instancias vs original despues de cambios al componente |
 | Hijos internos (grandchildren) desfasados | Solo se restauraron children directos, no los nietos (Group>Text) | Restaurar posiciones en TODOS los niveles de profundidad, no solo nivel 1 |
 
+### Consolidacion de Componentes
+| Error | Causa | Prevencion |
+|-------|-------|------------|
+| Instancias pierden texto/overrides | Se elimino un component set y se swap a otro — los overrides de texto se pierden | ANTES de eliminar: scan todas las instancias, guardar overrides (characters, fills, sizes). Restaurar despues del swap |
+| Boton dice "Button Title" | Instancia apuntaba al set eliminado, swap a otro variant reseteo texto | Despues de `swapComponent`, restaurar overrides de texto manualmente con `loadFontAsync` + `node.characters` |
+| Instancias infladas despues de swap | El component destino tiene dimensiones diferentes | Despues de swap, verificar y corregir width/height de CADA instancia afectada |
+| foto-drag/card instances enormes | Component resize propago a instancias sin size override | Scan global: buscar instancias con height > expected y corregir |
+
 ### Librerias Externas
 | Error | Causa | Prevencion |
 |-------|-------|------------|

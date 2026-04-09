@@ -109,6 +109,8 @@ Orden optimizado para archivos de componentes (design system):
 **REGLA:** Al restaurar posiciones, hacerlo en TODOS los niveles (children, grandchildren, etc.), no solo nivel 1.
 **REGLA:** Preservar `textAutoResize` (WIDTH_AND_HEIGHT vs NONE). Si cambia, textos largos en instancias se rompen con wrapping.
 **REGLA:** Despues de corregir un componente, verificar que las instancias heredaron el fix. Si tienen size overrides, corregir las instancias tambien.
+**REGLA:** Al eliminar un component set duplicado y hacer swapComponent, los overrides de texto se PIERDEN. Guardar characters de cada instancia ANTES del swap y restaurar DESPUES con loadFontAsync + node.characters.
+**REGLA:** Despues de consolidar duplicados, hacer scan global de instancias infladas: `node.height > expectedHeight` → resize.
 
 #### Paso N.2b: Si PROYECTO → Pipeline de Proyecto
 
