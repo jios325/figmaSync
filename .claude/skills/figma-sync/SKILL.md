@@ -71,44 +71,63 @@ Regla de decision:
 Orden optimizado para archivos de componentes (design system):
 ```
 1. /design-normalizer           → Score inicial, inventario de componentes
+1b. Detectar librerias externas → Escanear instancias con `node.mainComponent.remote === true`
+                                   Mapear: que libreria(s) usa (Ant Design, Material, etc.)
+                                   Estos componentes se RESPETAN — no mover, no duplicar.
 2. Consolidar duplicados        → Merge componentes similares en component sets
                                    (ej: "bar-header" + "bar-header-white" = 1 component set)
+                                   Detectar variantes por tema: agregar propiedad Theme=Dark/Blue
 3. Renombrar variantes          → "Property 1=Default" → "State=Default, Theme=Light"
 4. /token-sync                  → Crear Primitives + Semantic con hex reales
-5. Auto Layout bottom-up        → En CADA componente (atoms → molecules → organisms)
+5. Auto Layout (SELECTIVO)      → SOLO en componentes simples que se benefician:
+                                   ✅ Buttons, inputs, checkboxes, tags (atoms simples)
+                                   ❌ Cards con children superpuestos, tables, bars complejas
+                                   ❌ Componentes con posicionamiento absoluto intencional
+                                   ANTES de aplicar: guardar child positions con script
+                                   DESPUES de aplicar: validar con screenshot vs original
+                                   Si se rompe: leer positions del original y restaurar
 6. Reorganizar por Atomic Design:
    - Atoms: buttons, inputs, icons, tags, badges, arrows
    - Molecules: cards, form fields, search bars, nav items
    - Organisms: headers, footers, menus, faqs, modulos completos
-6b. Layout grid en cada pagina   → Patron de `scripts/layoutPageGrid.js`:
-                                   ordenar por tipo+nombre, grid sin traslapes,
-                                   respetar altura maxima por fila.
-                                   Agrupar organismos por categoria (headers, footers, etc.)
-                                   Secciones grandes (ej: Cards 50+) → reorganizar internamente
-7. /component-library-sync      → Organizar en pagina Design System por categoria
+6b. Layout grid en cada pagina   → Patron de `scripts/layoutPageGrid.js`
+7. Validar instancias en pantallas:
+   - Scan: `node.mainComponent.remote` (externo) vs local
+   - Verificar que instancias locales apuntan a Atoms/Molecules/Organisms
+   - Comparar screenshot de CADA pantalla vs archivo original
+   - Corregir posiciones/dimensiones de instancias que cambiaron
 8. /figma-quality-gate          → Validacion (ajustar: no buscar sidebar/header de pantalla)
-9. Publicar como Library
+9. Publicar como Library (opcional)
 ```
 
 **REGLA:** Tokens ANTES de componentes. Siempre.
 **REGLA:** Consolidar duplicados ANTES de tokenizar (menos nodos = menos trabajo).
 **REGLA:** En librerias, buscar con `search_design_system` si el componente ya existe en otra libreria conectada antes de recrear.
+**REGLA:** Librerias externas (`remote: true`) son dependencias validas. Se documentan, no se reemplazan.
+**REGLA:** Auto Layout es DESTRUCTIVO en componentes absolutos. Revertir `layoutMode=NONE` NO restaura posiciones. Guardar antes, validar despues.
+**REGLA:** Modificar un componente afecta TODAS sus instancias en pantallas. Siempre validar pantallas despues de cambios.
+**REGLA:** Al restaurar posiciones, hacerlo en TODOS los niveles (children, grandchildren, etc.), no solo nivel 1.
+**REGLA:** Preservar `textAutoResize` (WIDTH_AND_HEIGHT vs NONE). Si cambia, textos largos en instancias se rompen con wrapping.
+**REGLA:** Despues de corregir un componente, verificar que las instancias heredaron el fix. Si tienen size overrides, corregir las instancias tambien.
 
 #### Paso N.2b: Si PROYECTO → Pipeline de Proyecto
 
 Orden estandar para archivos con pantallas:
 ```
 1. /design-normalizer           → Score inicial
+1b. Detectar librerias externas → Escanear `remote: true`. Documentar dependencias.
 2. Limpieza estructural         → Renombrar layers, aplanar nesting, organizar paginas
 3. /token-sync                  → Extraer colores reales, crear y aplicar variables
-4. Auto Layout                  → Convertir layouts fijos a flexbox (bottom-up)
+4. Auto Layout (SELECTIVO)      → Solo atoms simples. Guardar positions antes. Validar despues.
 5. /component-library-sync      → Extraer y organizar componentes locales
 6. search_design_system          → Reemplazar locals por instancias de libreria donde existan
-7. /figma-quality-gate          → Validacion final (score objetivo: >80)
+7. Validar pantallas            → Screenshot diff vs original para CADA pantalla
+8. /figma-quality-gate          → Validacion final (score objetivo: >80)
 ```
 
 **REGLA:** Tokens ANTES de componentes. Siempre.
 **REGLA:** En proyectos, preferir instancias de libreria sobre componentes locales.
+**REGLA:** Librerias externas coexisten con la local. El % de uso se reporta pero no es un problema.
 
 ### Si el usuario quiere detectar diferencias entre Figma y produccion:
 **Flujo: Drift Detection**

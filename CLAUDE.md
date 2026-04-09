@@ -75,11 +75,17 @@ Para normalizar un archivo Figma desordenado, ejecutar EN ESTE ORDEN:
 
 ```
 1. /design-normalizer       → Auditoria (score inicial, inventario de colores)
+1b. Detectar librerias       → Escanear instancias con `remote: true` (Ant Design, Material, etc.)
+                               Estas se RESPETAN, no se duplican ni se mueven.
 2. Limpieza estructural     → Renombrar layers, aplanar nesting, organizar paginas
-3. /token-sync              → Extraer colores REALES del diseno, crear y aplicar variables
-4. Auto Layout              → Convertir layouts fijos a flexbox (bottom-up)
-5. /component-library-sync  → Extraer y organizar componentes
-6. /figma-quality-gate      → Validacion final (score objetivo: >80)
+3. Consolidar duplicados    → ANTES de tokenizar. Merge variantes tema/estado en 1 component set.
+4. /token-sync              → Extraer colores REALES del diseno, crear y aplicar variables
+5. Auto Layout (SELECTIVO)  → SOLO en componentes simples (atoms). NO aplicar ciegamente a
+                               componentes con posicionamiento absoluto complejo (cards, tables, bars).
+                               Guardar child positions ANTES de aplicar. Validar visualmente DESPUES.
+6. /component-library-sync  → Extraer y organizar componentes por Atomic Design
+7. Validacion pantallas     → Comparar CADA pantalla vs archivo original (screenshot diff)
+8. /figma-quality-gate      → Validacion final (score objetivo: >80)
 ```
 
 **REGLA:** Tokens ANTES de componentes. Siempre.
@@ -87,9 +93,12 @@ Para normalizar un archivo Figma desordenado, ejecutar EN ESTE ORDEN:
 **REGLA:** Checkpoint visual despues de cada fase. Si algo se ve mal → undo.
 **REGLA:** Aplicar variables por CONTEXTO (nombre/tipo de nodo), NO por hex match.
 **REGLA:** Copiar componentes como referencia ANTES de tokenizar.
+**REGLA:** Componentes de librerias externas (`remote: true`) se RESPETAN. No mover, no duplicar, no recrear.
+**REGLA:** Auto Layout es DESTRUCTIVO — revertir `layoutMode=NONE` NO restaura posiciones originales. Guardar positions antes.
 
-## Errores Conocidos en Tokenizacion
+## Errores Conocidos
 
+### Tokenizacion
 | Error | Causa | Prevencion |
 |-------|-------|------------|
 | Colores no coinciden | Se usaron colores del codigo | Escanear hex reales del archivo Figma |
@@ -98,6 +107,23 @@ Para normalizar un archivo Figma desordenado, ejecutar EN ESTE ORDEN:
 | Cuadros negros en placeholders | Fills IMAGE ignorados | Escanear ALL fill types (SOLID + IMAGE) |
 | Texto invisible en botones | Texto y fondo del mismo color | Verificar contraste en variantes hover/active |
 | Colores intencionales cambiados | Se "arreglaron" colores que eran correctos | Comparar con referencia antes de cambiar |
+
+### Auto Layout
+| Error | Causa | Prevencion |
+|-------|-------|------------|
+| Instancias en pantallas rotas | Auto Layout en componente re-posiciono hijos | Guardar child positions ANTES. Validar screenshots DESPUES |
+| Revertir AL no restaura layout | `layoutMode=NONE` mantiene posiciones de AL | Leer posiciones del archivo original y restaurar manualmente |
+| Texto invisible en filas | Hijos desplazados fuera del viewport del componente | Verificar que x/y de text nodes estan dentro de width/height |
+| Cards/tables colapsadas | Componentes con layout absoluto no toleran AL | No aplicar AL a componentes con children superpuestos o positioned |
+| Texto wrapping en instancias | `textAutoResize` cambio de WIDTH_AND_HEIGHT a NONE | Preservar `textAutoResize` original. Verificar en componente Y en instancias |
+| Componente resize rompe instancias | El resize del componente propaga pero instancias tienen overrides | Verificar dimensiones de instancias vs original despues de cambios al componente |
+| Hijos internos (grandchildren) desfasados | Solo se restauraron children directos, no los nietos (Group>Text) | Restaurar posiciones en TODOS los niveles de profundidad, no solo nivel 1 |
+
+### Librerias Externas
+| Error | Causa | Prevencion |
+|-------|-------|------------|
+| 40%+ instancias "no conectadas" | Son de libreria externa (remote:true), no local | Detectar `node.mainComponent.remote` ANTES de reportar como problema |
+| Componentes duplicados innecesarios | Se recreo localmente un componente de Ant Design | Verificar `search_design_system` y `remote` flag antes de crear |
 
 ## Arquitectura: Como Interactuan los Skills
 

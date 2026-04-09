@@ -1,6 +1,6 @@
 ---
 name: normalization-pipeline
-description: "Pipeline completo para normalizar cualquier archivo Figma desordenado. Ejecuta 6 fases en orden estricto: auditoria, limpieza, tokenizacion, auto layout, componentizacion, validacion. Usa cuando el usuario pide normalizar, limpiar, organizar, o arreglar un archivo de Figma desde cero."
+description: "Pipeline completo para normalizar cualquier archivo Figma desordenado. Ejecuta 8 fases en orden estricto: auditoria, deteccion de librerias externas, limpieza, consolidacion, tokenizacion, auto layout selectivo, componentizacion, validacion visual vs original. Soporta archivos con librerias externas (Ant Design, Material UI, etc.). Usa cuando el usuario pide normalizar, limpiar, organizar, o arreglar un archivo de Figma desde cero."
 triggers:
   - "normaliza este archivo"
   - "limpia este figma"
@@ -22,9 +22,14 @@ tools:
 ## Principio
 
 > TOKENS PRIMERO → COMPONENTES DESPUES. Siempre.
+> AUTO LAYOUT SELECTIVO — solo en atoms simples. NUNCA ciegamente en componentes complejos.
+> LIBRERIAS EXTERNAS SE RESPETAN — no duplicar, no mover, no recrear.
 
 Los tokens son la capa fundacional. Los componentes son consumidores de tokens.
 Si componentizas antes de tokenizar, tendras que re-hacer todo.
+
+Archivos reales usan librerias externas (Ant Design, Material UI, etc.) junto con
+componentes locales. Ambas coexisten. El pipeline debe detectar y respetar las externas.
 
 ## Prerequisitos
 
@@ -43,7 +48,22 @@ Si componentizas antes de tokenizar, tendras que re-hacer todo.
    ```
    get_metadata(nodeId: "0:1", fileKey)
    ```
-3. Extraer inventario de colores REALES del archivo:
+3. **Detectar librerias externas** — escanear instancias para identificar componentes remotos:
+   ```javascript
+   // via use_figma: check for remote components
+   if (node.type === 'INSTANCE' && node.mainComponent) {
+     if (node.mainComponent.remote === true) {
+       // Componente de libreria EXTERNA (Ant Design, Material UI, etc.)
+       // Registrar pero NO tocar. No mover, no duplicar, no recrear.
+       const libName = node.mainComponent.parent ? node.mainComponent.parent.name : node.mainComponent.name;
+       externalLibs[libName] = (externalLibs[libName] || 0) + 1;
+     }
+   }
+   ```
+   **OUTPUT:** Reporte de dependencias externas: libreria → cantidad de instancias.
+   Estas son dependencias VALIDAS que coexisten con la libreria local.
+
+4. Extraer inventario de colores REALES del archivo:
    ```javascript
    // via use_figma: traverse all nodes, extract unique hex values with counts
    const colorMap = {};

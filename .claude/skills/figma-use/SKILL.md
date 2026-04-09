@@ -156,6 +156,83 @@ frame.paddingLeft = frame.paddingRight = 16;
 frame.itemSpacing = 8;
 ```
 
+### 15b. Auto Layout es DESTRUCTIVO — guardar positions antes de aplicar
+```javascript
+// Auto Layout re-posiciona TODOS los hijos. Revertir layoutMode=NONE
+// NO restaura las posiciones originales. SIEMPRE guardar antes:
+
+// PASO 1: Guardar posiciones
+const savedPositions = {};
+for (const child of component.children) {
+  savedPositions[child.id] = { x: child.x, y: child.y, w: child.width, h: child.height };
+}
+
+// PASO 2: Aplicar Auto Layout
+component.layoutMode = "HORIZONTAL";
+// ... configurar propiedades
+
+// PASO 3: Si se rompe, restaurar
+component.layoutMode = "NONE";
+for (const child of component.children) {
+  const pos = savedPositions[child.id];
+  if (pos) { child.x = pos.x; child.y = pos.y; child.resize(pos.w, pos.h); }
+}
+```
+
+### 15c. Preservar textAutoResize al modificar componentes
+```javascript
+// PELIGRO: Al aplicar/revertir Auto Layout, textAutoResize puede cambiar
+// de WIDTH_AND_HEIGHT a NONE. Esto rompe instancias con texto largo.
+
+// ANTES de modificar un componente, guardar textAutoResize de TODOS los text nodes:
+const savedTextProps = {};
+function saveTextProps(node) {
+  if (node.type === 'TEXT') {
+    savedTextProps[node.id] = {
+      textAutoResize: node.textAutoResize,
+      w: node.width, h: node.height
+    };
+  }
+  if ('children' in node) node.children.forEach(saveTextProps);
+}
+saveTextProps(component);
+
+// DESPUES de modificar, restaurar:
+function restoreTextProps(node) {
+  if (node.type === 'TEXT' && savedTextProps[node.id]) {
+    node.textAutoResize = savedTextProps[node.id].textAutoResize;
+  }
+  if ('children' in node) node.children.forEach(restoreTextProps);
+}
+restoreTextProps(component);
+```
+
+### 15d. NO aplicar Auto Layout a componentes con layout absoluto complejo
+```javascript
+// PELIGROSO — componentes donde hijos se superponen o usan x/y intencional:
+// ❌ Cards con imagen + texto superpuesto
+// ❌ Tables/rows con columnas a x fijo
+// ❌ Componentes con children que desbordan el parent
+// ❌ Cualquier componente donde children tienen x > 0 en patron no-secuencial
+
+// SEGURO — componentes donde hijos son secuenciales:
+// ✅ Buttons (icon + text)
+// ✅ Tags (text + badge)
+// ✅ Simple inputs (icon + field)
+// ✅ Componentes con un solo child
+```
+
+### 15d. Detectar librerias externas antes de modificar
+```javascript
+// Componentes con remote=true son de librerias externas (Ant Design, etc.)
+// NUNCA modificar, mover, o intentar reemplazar estos componentes
+const isExternal = node.mainComponent && node.mainComponent.remote === true;
+if (isExternal) {
+  // Respetar — no tocar
+  return;
+}
+```
+
 ### 16. Component properties: usar setProperties con key completo
 ```javascript
 // WRONG
