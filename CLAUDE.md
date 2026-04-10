@@ -4,9 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Que es esto
 
-Toolkit de agentes AI para sincronizacion bidireccional Figma <-> Codigo.
-No es una app — son skills, runbooks y prompts que Claude Code interpreta para operar sobre Figma.
+Toolkit de agentes AI para sincronizacion bidireccional Figma <-> Codigo, con inteligencia de diseno integrada.
+No es una app — son 22 skills que Claude Code interpreta para operar sobre Figma con criterio profesional de UI/UX.
 Funciona con CUALQUIER proyecto, framework o libreria UI.
+
+Incluye [ui-ux-pro-max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill): 161 reglas de razonamiento, 67 estilos UI, 161 paletas, 57 pares tipograficos y 99 guidelines UX.
 
 ## Stack MCP
 
@@ -40,15 +42,30 @@ Conversion de Node ID: la URL usa "-", los tools usan ":"
   1635-27981 (URL) → 1635:27981 (parametro)
 ```
 
-## Skills (11, todos project-agnostic)
+## Skills (22, todos project-agnostic)
 
-### Normalizacion
+### Inteligencia de Diseno (ui-ux-pro-max)
+| Skill | Cuando usar |
+|-------|-------------|
+| `/ui-ux-pro-max` | **Buscar** estilo, paleta, tipografia, guidelines UX para un tipo de producto. 161 reglas, 67 estilos, 99 guidelines. Usar ANTES de crear pantallas o definir design system |
+| `/uipro-design-system` | Arquitectura de tokens 3 capas (primitive→semantic→component), specs de componentes, generacion de slides |
+| `/ui-styling` | Referencia de componentes shadcn/ui, utilidades Tailwind, responsive, dark mode, accesibilidad |
+
+### Marca & Identidad
+| Skill | Cuando usar |
+|-------|-------------|
+| `/brand` | Definir identidad de marca: voz, colores, tipografia, visual identity. Fuente de verdad para todo el proyecto |
+| `/uipro-design` | Router unificado: logos (55 estilos), CIP (50 deliverables), iconos, banners, slides, social media |
+| `/banner-design` | Banners para redes sociales, ads, heroes. 22 estilos, multiples plataformas |
+| `/slides` | Presentaciones HTML con Chart.js, design tokens, copywriting formulas, layouts responsivos |
+
+### Normalizacion Figma
 | Skill | Cuando usar |
 |-------|-------------|
 | `/normalization-pipeline` | **Pipeline completo** para normalizar un archivo Figma desordenado (6 fases en orden) |
 | `/design-normalizer` | Auditar salud del archivo Figma (score 0-100, naming, tokens, Auto Layout) |
 
-### Creacion
+### Creacion Figma
 | Skill | Cuando usar |
 |-------|-------------|
 | `/screen-creator` | Crear pantallas nuevas (siempre clona una hermana existente, nunca desde cero) |
@@ -68,6 +85,76 @@ Conversion de Node ID: la URL usa "-", los tools usan ":"
 | `/drift-detection` | Comparar Figma vs produccion via diff visual + estructural |
 | `/figma-quality-gate` | Checklist de validacion post-creacion |
 | `/ui-framework-patterns` | Patrones de pantallas CRUD por framework UI |
+
+## Busqueda de Inteligencia de Diseno
+
+```bash
+# Buscar recomendaciones por dominio
+python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<query>" --domain <domain> [-n <max>]
+
+# Dominios: product, style, typography, color, landing, chart, ux
+# Stacks: html-tailwind, react, nextjs, vue, nuxtjs, svelte, shadcn, flutter, swiftui, react-native
+
+# Ejemplos:
+python3 .claude/skills/ui-ux-pro-max/scripts/search.py "hotel CMS" --domain product
+python3 .claude/skills/ui-ux-pro-max/scripts/search.py "hospitality" --domain color
+python3 .claude/skills/ui-ux-pro-max/scripts/search.py "admin dashboard" --domain style
+```
+
+## Flujo Completo de Trabajo
+
+### Fase 1 — Definir Proyecto (una sola vez)
+```
+/ui-ux-pro-max       → Buscar estilo, paleta, tipografia para el tipo de producto
+  ▼
+/brand               → Definir identidad de marca (colores, voz, tipografia)
+  ▼
+/uipro-design-system → Estructurar tokens 3 capas (primitive→semantic→component)
+  ▼
+/token-sync          → Crear variables en Figma desde los tokens
+  ▼
+/design-system-rules-generator → Generar reglas para agentes AI
+```
+
+### Fase 2 — Normalizar Diseno Existente
+```
+/normalization-pipeline → Orquestador de 6 fases
+  ├── /design-normalizer    → Auditoria (score, inventario)
+  ├── Limpieza estructural  → Renombrar layers, organizar paginas
+  ├── /token-sync + /brand  → Aplicar variables, validar on-brand
+  ├── Auto Layout           → Selectivo, bottom-up
+  ├── /component-library-sync + /ui-framework-patterns → Componentizar
+  └── /figma-quality-gate + /ui-ux-pro-max → Validacion final
+```
+
+### Fase 3 — Crear Pantallas Nuevas
+```
+/ui-ux-pro-max search    → Patron de UI para el tipo de pantalla
+  ▼
+/ui-framework-patterns   → Estructura CRUD del framework (Ant Design, shadcn, etc.)
+  ▼
+/screen-creator          → Clonar pantalla hermana en Figma
+  ▼
+/variant-generator       → Variantes (empty, loading, error)
+  ▼
+/figma-quality-gate      → Validar
+```
+
+### Fase 4 — Sincronizacion Bidireccional
+```
+Figma → Codigo:
+  /figma-sync → get_design_context → /code-connect-bridge → /ui-styling → codigo
+
+Codigo → Figma:
+  /figma-sync → /drift-detection → /figma-use → use_figma → /variant-generator
+```
+
+### Fase 5 — Monitoreo Continuo
+```
+/design-system-health  → Dashboard: tokens + Code Connect + componentes
+/drift-detection       → Figma vs produccion sincronizados?
+/slides                → Presentar metricas con Chart.js
+```
 
 ## Pipeline de Normalizacion (orden estricto)
 
@@ -133,8 +220,52 @@ Para normalizar un archivo Figma desordenado, ejecutar EN ESTE ORDEN:
 | 40%+ instancias "no conectadas" | Son de libreria externa (remote:true), no local | Detectar `node.mainComponent.remote` ANTES de reportar como problema |
 | Componentes duplicados innecesarios | Se recreo localmente un componente de Ant Design | Verificar `search_design_system` y `remote` flag antes de crear |
 
-## Arquitectura: Como Interactuan los Skills
+## Arquitectura: Como Interactuan los 22 Skills
 
+```
+                    ┌─────────────────┐
+                    │  ui-ux-pro-max  │ ← Inteligencia de diseno (161 reglas)
+                    │  67 estilos     │
+                    │  161 paletas    │
+                    └────────┬────────┘
+                             │ informa
+              ┌──────────────┼──────────────┐
+              ▼              ▼              ▼
+         ┌────────┐   ┌───────────┐  ┌──────────┐
+         │ brand  │   │ uipro-ds  │  │ui-styling│
+         │(marca) │   │ (tokens)  │  │(Tailwind)│
+         └───┬────┘   └─────┬─────┘  └────┬─────┘
+             │              │              │
+             └──────┬───────┘              │
+                    ▼                      │
+              ┌───────────┐                │
+              │ token-sync │ ◄─────────────┘
+              │(Figma vars)│
+              └─────┬──────┘
+                    │ alimenta
+     ┌──────────────┼──────────────┐
+     ▼              ▼              ▼
+┌──────────┐ ┌────────────┐ ┌──────────────┐
+│ screen   │ │ component  │ │  variant     │
+│ creator  │ │ library    │ │  generator   │
+└────┬─────┘ └──────┬─────┘ └──────┬───────┘
+     │              │              │
+     └──────────────┼──────────────┘
+                    ▼
+     ┌──────────────┼──────────────┐
+     ▼              ▼              ▼
+┌──────────┐ ┌────────────┐ ┌──────────────┐
+│ quality  │ │   drift    │ │ design-sys   │
+│  gate    │ │ detection  │ │   health     │
+└──────────┘ └────────────┘ └──────────────┘
+                    ▲
+                    │
+              ┌─────┴──────┐
+              │ figma-sync │ ← Orquestador Figma↔Codigo
+              └────────────┘
+```
+
+**Routing del orquestador:**
 ```
 Prompt del usuario → figma-sync (orquestador)
                        ├── "implementa este frame" → flujo Figma→Code
@@ -142,13 +273,16 @@ Prompt del usuario → figma-sync (orquestador)
                        ├── "normaliza"              → normalization-pipeline
                        ├── "audita"                 → design-normalizer
                        ├── "que cambio"             → drift-detection
-                       └── "mapea componentes"      → code-connect-bridge
+                       ├── "mapea componentes"      → code-connect-bridge
+                       ├── "define la marca"        → brand + ui-ux-pro-max
+                       └── "crea banner/slides"     → banner-design / slides
 ```
 
 Todos los skills se adaptan al proyecto destino leyendo:
 1. El archivo Figma activo — estructura, componentes, tokens existentes
 2. El CLAUDE.md del proyecto destino — convenciones, stack, reglas
 3. El codigo del proyecto — componentes, props, estilos
+4. La inteligencia de diseno — ui-ux-pro-max busca en 7 dominios (product, style, color, typography, landing, chart, ux)
 
 ## Referencia de Herramientas
 
