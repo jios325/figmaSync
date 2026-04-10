@@ -11,13 +11,104 @@ Funciona con **cualquier** proyecto, framework o libreria UI.
 cp -r .claude/skills/ ~/tu-proyecto/.claude/skills/
 
 # 2. Configurar Figma Remote MCP (lectura + escritura)
-claude mcp add --transport http figma-remote https://mcp.figma.com/mcp
+#    Ver seccion "Autenticacion del MCP" abajo para obtener el token OAuth
+claude mcp add --transport http figma-remote https://mcp.figma.com/mcp \
+  --header "Authorization: Bearer TU_TOKEN_OAUTH"
 
 # 3. Listo. Auditar el archivo:
 /figma-sync audita esta libreria: [URL de Figma]
 ```
 
 > **Desktop Bridge es OPCIONAL.** Con solo el paso 2 ya puedes leer y escribir en Figma via `use_figma`.
+
+---
+
+## Autenticacion del MCP
+
+El Figma MCP Server requiere **OAuth**, no Personal Access Tokens. Los Personal Access Tokens (`figd_...`) solo funcionan con la REST API directa (`api.figma.com`) usando el header `X-Figma-Token`, pero el MCP (`mcp.figma.com/mcp`) necesita un token OAuth (`figu_...`) con el header `Authorization: Bearer`.
+
+### Paso 1 — Generar un Personal Access Token (necesario para verificar tu cuenta)
+
+1. Ve a [figma.com/settings](https://www.figma.com/settings) → seccion **Personal access tokens**
+2. Click **Generate new token** → activa todos los scopes → copia el token (`figd_...`)
+
+### Paso 2 — Obtener el token OAuth via flujo automatizado
+
+El MCP usa OAuth con registro dinamico de clientes. Ejecuta estos comandos en orden:
+
+```bash
+# 2a. Registrar cliente OAuth (una sola vez)
+curl -s -X POST 'https://api.figma.com/v1/oauth/mcp/register' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "client_name": "Claude Code FigmaSync",
+    "redirect_uris": ["http://localhost:9274/callback"],
+    "grant_types": ["authorization_code", "refresh_token"],
+    "response_types": ["code"],
+    "token_endpoint_auth_method": "client_secret_post"
+  }'
+# Guarda el client_id y client_secret que retorna
+```
+
+```bash
+# 2b. Generar PKCE challenge
+CODE_VERIFIER=$(python3 -c "import secrets; print(secrets.token_urlsafe(64)[:128])")
+CODE_CHALLENGE=$(echo -n "$CODE_VERIFIER" | openssl dgst -sha256 -binary | base64 | tr '+/' '-_' | tr -d '=')
+STATE=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+```
+
+```bash
+# 2c. Levantar servidor callback temporal
+python3 -c "
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import urlparse, parse_qs
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        params = parse_qs(urlparse(self.path).query)
+        code = params.get('code', [''])[0]
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html')
+        self.end_headers()
+        self.wfile.write(f'<h1>Autorizado!</h1><p>Code: <b>{code}</b></p>'.encode())
+        print(f'AUTH_CODE={code}')
+
+HTTPServer(('localhost', 9274), Handler).handle_request()
+" &
+```
+
+```bash
+# 2d. Abrir URL de autorizacion en el navegador (reemplazar CLIENT_ID, STATE, CODE_CHALLENGE)
+open "https://www.figma.com/oauth/mcp?client_id=CLIENT_ID&redirect_uri=http%3A%2F%2Flocalhost%3A9274%2Fcallback&response_type=code&scope=mcp%3Aconnect&state=$STATE&code_challenge=$CODE_CHALLENGE&code_challenge_method=S256"
+
+# Autoriza en Figma → el servidor captura el AUTH_CODE
+```
+
+```bash
+# 2e. Intercambiar codigo por token OAuth (reemplazar AUTH_CODE, CLIENT_ID, CLIENT_SECRET, CODE_VERIFIER)
+curl -s -X POST 'https://api.figma.com/v1/oauth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d "grant_type=authorization_code&code=AUTH_CODE&redirect_uri=http://localhost:9274/callback&client_id=CLIENT_ID&client_secret=CLIENT_SECRET&code_verifier=$CODE_VERIFIER"
+
+# Retorna: { "access_token": "figu_...", "refresh_token": "figur_...", "expires_in": 7776000 }
+```
+
+### Paso 3 — Configurar el MCP con el token OAuth
+
+```bash
+claude mcp add --transport http figma-remote https://mcp.figma.com/mcp \
+  --header "Authorization: Bearer figu_TU_TOKEN_OAUTH"
+```
+
+### Renovar el token (expira en 90 dias)
+
+```bash
+curl -s -X POST 'https://api.figma.com/v1/oauth/refresh' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d "client_id=CLIENT_ID&client_secret=CLIENT_SECRET&refresh_token=figur_TU_REFRESH_TOKEN"
+```
+
+> **Tip:** Guarda el `client_id`, `client_secret` y `refresh_token` en un lugar seguro. Solo necesitas registrar el cliente una vez — para renovar solo necesitas el refresh token.
 
 ---
 
