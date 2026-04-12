@@ -1,7 +1,7 @@
 # FigmaSync
 
 Toolkit de agentes AI para sincronizacion bidireccional Figma <-> Codigo, con inteligencia de diseno integrada.
-No es una app — son **23 skills** que Claude Code interpreta para operar sobre Figma con criterio profesional de UI/UX.
+No es una app — son **24 skills** que Claude Code interpreta para operar sobre Figma con criterio profesional de UI/UX.
 Funciona con **cualquier** proyecto, framework o libreria UI.
 
 Incluye [ui-ux-pro-max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill): 161 reglas de razonamiento, 67 estilos UI, 161 paletas de color, 57 pares tipograficos y 99 guidelines UX.
@@ -194,6 +194,30 @@ https://www.figma.com/design/XXXXX/mi-libreria?node-id=0-1
 
 **Que hace:** Escanea componentes en Figma → AI sugiere mapeos al codigo → presenta tabla para confirmar → guarda mappings en bulk.
 
+### Sincronizar cambios entre Figma y codigo (incremental)
+
+```
+/sync-engine https://www.figma.com/design/XXXXX/mi-proyecto?node-id=20-2
+```
+
+**Que hace:** Compara el estado actual de Figma vs el codigo → detecta diferencias en tokens, textos, layout, y secciones → presenta un diff al usuario → aplica solo los cambios necesarios en la direccion elegida (Figma→Code o Code→Figma). No recaptura ni regenera toda la pagina.
+
+**Modos:**
+- `sync` (default) — detecta y aplica cambios
+- `report` — solo muestra el diff, no modifica nada
+- `tokens-only` — solo sincroniza colores, spacing, tipografia
+- `content-only` — solo sincroniza textos y copy
+
+**Ejemplo: cambié un color en Figma y quiero reflejarlo en el codigo:**
+```
+/sync-engine tokens-only figma→code https://www.figma.com/design/XXXXX/...
+```
+
+**Ejemplo: cambié textos en el codigo y quiero reflejarlos en Figma:**
+```
+/sync-engine content-only code→figma https://www.figma.com/design/XXXXX/...
+```
+
 ### Capturar la UI del proyecto a Figma (desktop + mobile)
 
 ```
@@ -268,7 +292,7 @@ tipografia Roboto, voz profesional-hospitalaria
 
 ---
 
-## Todos los Skills (23)
+## Todos los Skills (24)
 
 ### Inteligencia de Diseno (ui-ux-pro-max)
 | Skill | Tipo | Descripcion |
@@ -309,6 +333,7 @@ tipografia Roboto, voz profesional-hospitalaria
 |-------|------|-------------|
 | `/figma-sync` | Both | Orquestador — detecta libreria vs proyecto, rutea al pipeline correcto |
 | `/code-to-figma` | Write | Capturar UI a Figma: multi-viewport (desktop+mobile+tablet), lazy load, multi-framework |
+| `/sync-engine` | Both | **Sync incremental bidireccional.** Detecta delta, muestra diff, aplica solo cambios necesarios |
 | `/token-sync` | Write | Sincronizar tokens. Soporta Extended Collections (Enterprise) |
 | `/code-connect-bridge` | Write | Mapear componentes Figma → codigo. Templates parserless avanzados |
 | `/design-system-rules-generator` | Write | Generar reglas de DS para CLAUDE.md/AGENTS.md/.cursor/rules |

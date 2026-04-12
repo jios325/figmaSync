@@ -144,8 +144,28 @@ Orden estandar para archivos con pantallas:
 **REGLA:** En proyectos, preferir instancias de libreria sobre componentes locales.
 **REGLA:** Librerias externas coexisten con la local. El % de uso se reporta pero no es un problema.
 
+### Si el usuario quiere sincronizar cambios incrementales:
+**Flujo: Sync Incremental** → Delegar a `/sync-engine`
+
+Detecta el delta (que cambio) entre Figma y codigo, presenta un diff al usuario,
+y aplica solo los cambios necesarios en la direccion elegida. No recaptura ni regenera todo.
+
+Decision automatica de direccion:
+- Si Figma tiene mas cambios recientes → sugiere Figma → Code
+- Si codigo tiene mas cambios recientes → sugiere Code → Figma
+- Si ambos cambiaron → presenta diff y deja al usuario elegir
+
+Tipos de cambio que detecta y sincroniza:
+- **Tokens:** colores, spacing, tipografia (via `/token-sync`)
+- **Contenido:** textos, headlines, CTAs, labels
+- **Layout:** orden de secciones, reordenamiento
+- **Estructura:** secciones nuevas o eliminadas
+- **Visual:** diferencias de spacing, alineamiento, bordes
+
+Si el delta es > 50% de la pagina → fallback a `/code-to-figma` (recaptura completa).
+
 ### Si el usuario quiere detectar diferencias entre Figma y produccion:
-**Flujo: Drift Detection**
+**Flujo: Drift Detection** → puede delegar a `/sync-engine report-only`
 1. Inventariar frames en Figma (`get_metadata`)
 2. Inventariar rutas en codigo (`gitnexus_query`)
 3. Comparar screenshots (Figma vs produccion)
