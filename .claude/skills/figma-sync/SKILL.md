@@ -40,13 +40,26 @@ Analiza el prompt del usuario y decide que flujo ejecutar:
 7. Verificar visualmente comparando screenshots
 
 ### Si el usuario quiere actualizar Figma con el estado actual del codigo:
-**Flujo: Code → Figma**
-1. Verificar que el servidor local esta corriendo
-2. Preguntar destino: nuevo archivo, archivo existente, o clipboard
-3. Ejecutar `generate_figma_design` con el outputMode elegido
-4. Guiar al usuario en la captura
-5. Poll captureId hasta completar
-6. Confirmar que los frames se crearon en Figma
+**Flujo: Code → Figma** → Delegar a `/code-to-figma`
+
+Este flujo soporta captura multi-viewport (desktop + mobile + tablet) con manejo
+automatico de lazy load, Framer Motion, IntersectionObserver, GSAP, y AOS.
+Compatible con cualquier stack: Next.js, Vite, Vue, Nuxt, Angular, Astro, SvelteKit, plain HTML.
+
+1. Preguntar viewports deseados: desktop (1440), mobile (375), tablet (768), o todos
+2. Preguntar destino: nuevo archivo (`newFile`) o archivo existente (`existingFile`)
+3. **Ejecutar skill `/code-to-figma`** que maneja:
+   - Deteccion automatica del framework y archivo de layout
+   - Deteccion de lazy load (Framer Motion, IntersectionObserver, GSAP, AOS)
+   - Inyeccion temporal de auto-scroll + CSS override para forzar contenido visible
+   - Captura desktop via `open` + `generate_figma_design`
+   - Captura mobile via Chrome `--app --window-size=375,812 --user-data-dir=/tmp/...`
+   - Captura tablet via Chrome `--app --window-size=768,1024 --user-data-dir=/tmp/...`
+   - Polling de captureId hasta completar (max 10 intentos)
+   - Renombrado de frames por viewport ("Desktop — 1440px", "Mobile — 375px")
+   - Limpieza de scripts temporales, duplicados, y perfil Chrome temporal
+4. Verificar con `get_screenshot` que cada frame se capturo completo
+5. Opcionalmente ejecutar `/token-sync` para crear variables de color en Figma
 
 ### Si el usuario quiere auditar/normalizar un archivo de Figma:
 **Flujo: Normalizacion**

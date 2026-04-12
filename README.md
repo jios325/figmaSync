@@ -1,7 +1,7 @@
 # FigmaSync
 
 Toolkit de agentes AI para sincronizacion bidireccional Figma <-> Codigo, con inteligencia de diseno integrada.
-No es una app — son **22 skills** que Claude Code interpreta para operar sobre Figma con criterio profesional de UI/UX.
+No es una app — son **23 skills** que Claude Code interpreta para operar sobre Figma con criterio profesional de UI/UX.
 Funciona con **cualquier** proyecto, framework o libreria UI.
 
 Incluye [ui-ux-pro-max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill): 161 reglas de razonamiento, 67 estilos UI, 161 paletas de color, 57 pares tipograficos y 99 guidelines UX.
@@ -194,6 +194,21 @@ https://www.figma.com/design/XXXXX/mi-libreria?node-id=0-1
 
 **Que hace:** Escanea componentes en Figma → AI sugiere mapeos al codigo → presenta tabla para confirmar → guarda mappings en bulk.
 
+### Capturar la UI del proyecto a Figma (desktop + mobile)
+
+```
+/code-to-figma captura desktop y mobile a:
+https://www.figma.com/design/XXXXX/mi-proyecto?node-id=0-1
+```
+
+**Que hace:** Detecta el framework y lazy load del proyecto → inyecta scripts temporales para forzar contenido visible → hace auto-scroll para activar IntersectionObserver/Framer Motion → captura desktop (1440px) via `open` → captura mobile (375px) via Chrome `--app --window-size=375,812` → renombra frames → limpia scripts temporales y duplicados.
+
+**Viewports soportados:** Desktop (1440px), Mobile (375px), Tablet (768px), Custom (NxM).
+
+**Frameworks soportados:** Next.js, Vite, Vue, Nuxt, Angular, Astro, SvelteKit, plain HTML.
+
+**Lazy load soportado:** Framer Motion, IntersectionObserver, GSAP, ScrollTrigger, AOS, `loading="lazy"`.
+
 ### Crear un archivo Figma nuevo
 
 ```
@@ -253,7 +268,7 @@ tipografia Roboto, voz profesional-hospitalaria
 
 ---
 
-## Todos los Skills (22)
+## Todos los Skills (23)
 
 ### Inteligencia de Diseno (ui-ux-pro-max)
 | Skill | Tipo | Descripcion |
@@ -293,6 +308,7 @@ tipografia Roboto, voz profesional-hospitalaria
 | Skill | Tipo | Descripcion |
 |-------|------|-------------|
 | `/figma-sync` | Both | Orquestador — detecta libreria vs proyecto, rutea al pipeline correcto |
+| `/code-to-figma` | Write | Capturar UI a Figma: multi-viewport (desktop+mobile+tablet), lazy load, multi-framework |
 | `/token-sync` | Write | Sincronizar tokens. Soporta Extended Collections (Enterprise) |
 | `/code-connect-bridge` | Write | Mapear componentes Figma → codigo. Templates parserless avanzados |
 | `/design-system-rules-generator` | Write | Generar reglas de DS para CLAUDE.md/AGENTS.md/.cursor/rules |
@@ -354,7 +370,10 @@ Figma → Codigo:
   /figma-sync → get_design_context → /code-connect-bridge → /ui-styling → codigo
 
 Codigo → Figma:
-  /figma-sync → /drift-detection → /figma-use → use_figma → /variant-generator
+  /figma-sync → /code-to-figma → generate_figma_design (desktop 1440 + mobile 375)
+                                  ├── auto-scroll + lazy load override
+                                  ├── Chrome --app para mobile viewport
+                                  └── renombrar + limpiar duplicados
 ```
 
 ### Fase 5 — Monitoreo Continuo
